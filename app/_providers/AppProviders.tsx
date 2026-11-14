@@ -1,7 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Toaster } from "@/app/_components/Toaster";
 import { useCartStore } from "@/app/_stores/cartStore";
 import { MswProvider } from "./MswProvider";
@@ -30,7 +30,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <MswProvider>
       <QueryClientProvider client={queryClient}>
-        <NavigationTracker />
+        {/* usePathname()은 동적 라우트([id])에서 요청 시점 값 → Suspense 필요 (Cache Components) */}
+        <Suspense fallback={null}>
+          <NavigationTracker />
+        </Suspense>
         {children}
         <Toaster />
       </QueryClientProvider>

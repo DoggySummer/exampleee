@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { Suspense } from "react";
 
 const MOCKING_ENABLED = process.env.NEXT_PUBLIC_API_MOCKING === "enabled";
 
@@ -13,17 +13,21 @@ const MswStarter = dynamic(() => import("./MswStarter").then((m) => m.MswStarter
 
 /**
  * NEXT_PUBLIC_API_MOCKING=enabled 일 때만 MSW 워커를 켠다.
- * 워커가 준비되기 전에 요청이 나가면 실제 서버로 가므로, 준비될 때까지 화면을 그리지 않는다.
+ *
+ * - children은 항상 그린다. 워커 준비 전 API 요청은 apiClient가 기다렸다가 보낸다 (client.ts mockReady).
+ *   children을 막아 버리면 서버 렌더링 결과가 빈 화면이 되고 Cache Components의 instant 검증도 실패한다.
+ * - ssr:false 컴포넌트는 서버에서 "브라우저 전용" 신호를 던지므로 Suspense로 감싸야 한다.
+ *   감싸지 않으면 개발 서버에서 `Could not validate instant` 에러가 난다.
  */
 export function MswProvider({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(!MOCKING_ENABLED);
-
-  if (!MOCKING_ENABLED) return <>{children}</>;
-
   return (
     <>
-      <MswStarter onReady={() => setReady(true)} />
-      {ready && children}
+      {MOCKING_ENABLED && (
+        <Suspense fallback={null}>
+          <MswStarter />
+        </Suspense>
+      )}
+      {children}
     </>
   );
 }

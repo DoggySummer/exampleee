@@ -93,7 +93,7 @@ app/
 ├── owner/              # 점주
 │   ├── orders/page.tsx             /owner/orders     주문 관리
 │   ├── menus/ settlements/ store/                    (다음 작업)
-│   └── page.tsx                    /owner → /owner/orders 로 이동
+│   (/owner 접속 시 /owner/orders 로 이동 — next.config.ts redirects)
 ├── layout.tsx          # 폰트, viewport, Provider
 └── globals.css         # 디자인 토큰
 ```
@@ -170,7 +170,10 @@ feat(customer): 주문 취소 버튼 제거
 - 쿼리 키는 `_lib/constants/queryKeys.ts`에서만 생성
 - 상태 변경(mutation) 후에는 폴링을 기다리지 않고 `invalidateQueries`로 즉시 재조회
 - 동적 라우트(`[id]`)는 **Cache Components 규칙**에 따라 `page.tsx`에서 `params` Promise를 `<Suspense>` 안 클라이언트 컴포넌트로 넘기고 `use(params)`로 꺼냄 (`restaurants/[id]/page.tsx` 참고)
-- `msw/browser`처럼 브라우저 전용 모듈은 `next/dynamic`의 `ssr: false`로 불러옴 (서버 번들에 들어가면 빌드 실패)
+- `msw/browser`처럼 브라우저 전용 모듈은 `next/dynamic`의 `ssr: false`로 불러오고, **반드시 `<Suspense>`로 감쌈** (서버 번들에 들어가면 빌드 실패, 안 감싸면 instant 검증 에러)
+- `usePathname()`, `useSearchParams()`, `useParams()`를 쓰는 클라이언트 컴포넌트가 레이아웃에 있으면 `<Suspense>`로 감쌈 (동적 라우트에서 요청 시점 값이라 정적 셸을 막음)
+- 페이지 안에서 `redirect()`로 다른 주소로 보내지 않음 → `next.config.ts`의 `redirects()` 사용
+- 개발 서버 터미널에 `Could not validate instant` / `outside of <Suspense>`가 뜨면 위 규칙 위반이므로 바로 고칠 것
 
 ### 폴링 주기 (`_lib/constants/polling.ts`)
 
@@ -332,6 +335,27 @@ feat(common): 모바일 공통 컴포넌트 추가
 feat(customer): 음식점 목록·메뉴·장바구니 화면 추가
 feat(owner): 주문 관리 탭·카드 화면과 영업상태 토글 추가
 docs: README에 실행 방법·컨벤션·작업 내역 정리
+```
+
+### 2026-11-14 — Cache Components `instant` 검증 에러 수정
+
+개발 서버에서 `Route "/": Could not validate instant ...` 에러가 나던 문제 수정.
+
+| 원인 | 수정 |
+|---|---|
+| `ssr: false`로 불러온 `MswStarter`가 서버에서 "브라우저 전용" 신호를 던지는데, 루트 레이아웃에 `<Suspense>`가 없어 검증이 멈춤 | `MswStarter`를 `<Suspense fallback={null}>`로 감쌈 |
+| MSW 준비 전까지 `children`을 아예 안 그려서 서버 렌더링 결과가 빈 화면 | `children`은 항상 그리고, API 요청만 워커 준비까지 대기 (`client.ts`의 `mockReady` + 요청 인터셉터) |
+| 고쳐지자 드러난 추가 경고: `/restaurants/[id]`에서 `usePathname()`이 `<Suspense>` 밖 (`NavigationTracker`, 하단 탭 바) | 각각 `<Suspense fallback={null}>`로 감쌈 |
+| `/owner` 페이지의 `redirect()`가 렌더링 중 에러로 잡힘 | `app/owner/page.tsx` 삭제, `next.config.ts`의 `redirects()`로 이동 |
+
+**검증**: `.next` 캐시 삭제 후 `tsc`, `lint`, `build` 통과. 개발 서버에서 전체 화면 12개 접속 시 에러·경고 0건
+
+```
+fix(common): Cache Components instant 검증 에러 수정
+
+- MswStarter(ssr:false)와 usePathname 사용 컴포넌트를 Suspense로 감쌈
+- MSW 준비 전 화면을 막지 않고 API 요청만 대기하도록 변경
+- /owner 리다이렉트를 페이지 redirect()에서 next.config redirects로 이동
 ```
 
 ### 다음 작업
