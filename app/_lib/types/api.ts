@@ -1,4 +1,4 @@
-import type { DeliveryStatus, PaymentMethod } from "@/app/_lib/constants/status";
+import type { DeliveryStatus, PaymentMethod, RiderStatus } from "@/app/_lib/constants/status";
 import type { Role } from "@/app/_lib/constants/roles";
 import type { Address, DeliveryHistory, Menu, Order, OrderItem, Payment, Restaurant, Settlement, SettlementItem } from "./db";
 
@@ -126,4 +126,37 @@ export interface SettlementDetail extends Settlement {
 /** 이미지 업로드 응답 */
 export interface UploadResult {
   url: string;
+}
+
+/* ───────── 라이더 화면 응답 (API 요청서 R3~R7, S3) ───────── */
+
+/** R8(추가 요청) 내 라이더 정보·운행상태 */
+export interface RiderMe {
+  rider_id: number;
+  name: string;
+  status: RiderStatus;
+}
+
+/** R4 수락 가능한 주문 (조리완료 + 배달 없음) */
+export interface AvailableOrder {
+  order_id: number;
+  restaurant_name: string;
+  restaurant_address: string;
+  order_address: string;
+  delivery_fee: number;
+  ordered_time: string;
+  item_count: number;
+}
+
+/** R6 내 배달 (배달 상세 화면도 이 목록에서 찾아 쓴다) */
+export interface RiderDelivery {
+  delivery_id: number;
+  order_id: number;
+  status: DeliveryStatus;
+  restaurant_name: string;
+  restaurant_address: string;
+  order_address: string;
+  delivery_fee: number;
+  items: { menu_name: string; quantity: number }[];
+  history: Pick<DeliveryHistory, "status" | "changed_at">[];
 }

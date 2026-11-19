@@ -2,15 +2,15 @@
  * 데모용 주문 자동 진행.
  * 아직 만들지 않은 역할의 일을 시간이 지나면 저절로 해 준다.
  * - 사장님 화면 있음 → 접수·조리는 사장님이 직접 (AUTO_OWNER = false)
- * - 라이더 화면 없음 → 조리완료 뒤 배정·픽업·배달완료는 자동 (AUTO_RIDER = true)
- * 라이더 화면을 만들면 AUTO_RIDER를 false로 바꾼다.
+ * - 라이더 화면 있음 → 배정·픽업·배달완료도 라이더가 직접 (AUTO_RIDER = false)
+ * 한 역할만 시연할 때 나머지 역할을 자동으로 돌리고 싶으면 true로 바꾼다.
  */
 import type { DeliveryStatus } from "@/app/_lib/constants/status";
 import type { Order } from "@/app/_lib/types/db";
 import { db, seq } from "./data";
 
 export const AUTO_OWNER = false;
-export const AUTO_RIDER = true;
+export const AUTO_RIDER = false;
 /** 한 단계가 넘어가는 간격 (초) */
 const STEP_SEC = 12;
 

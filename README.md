@@ -34,7 +34,8 @@ npm run dev                    # http://localhost:3000
 
 - `customer@test.com`에는 예시 주문 3건이 있어요: `#0042` 배달중, `#0041` 거절(결제 취소), `#0040` 배달완료.
 - 결제는 **테스트 결제창**(토스 결제창 대신)에서 해요. "카드사 승인 실패로 테스트하기"를 체크하면 승인 실패 화면, [닫기]를 누르면 결제 취소 화면이 나와요.
-- 새로 한 주문은 **사장님 화면에서 수락·조리완료**해야 넘어가요. 라이더 화면이 아직 없어서 조리완료 뒤에는 **12초마다 자동으로** 배정 → 배달중 → 배달완료가 돼요. `app/_mocks/progress.ts`의 `AUTO_RIDER`로 끕니다.
+- 새로 한 주문은 사장님이 수락·조리완료하고, 라이더가 수락·픽업·배달완료해야 넘어가요.
+  한 역할만 시연할 때는 `app/_mocks/progress.ts`의 `AUTO_OWNER`·`AUTO_RIDER`를 `true`로 바꾸면 그 역할의 일이 12초마다 자동으로 진행돼요.
 - 품절 메뉴: 김밥천국 "돈까스김밥", 하루돈까스 "냉모밀". 영업종료 가게: 할매순대국. 배달비 무료: 바삭치킨.
 - 주문에 쓴 배송지(`광교중앙로 145`)를 지우면 409 오류가 나요.
 - 가게·메뉴 사진은 `public/mock/`의 임시 그림이에요.
@@ -46,6 +47,12 @@ npm run dev                    # http://localhost:3000
   알림음은 브라우저 정책 때문에 화면을 한 번 누른 뒤부터 나요.
 - 손님 창과 사장님 창을 같이 띄우면 손님 주문이 10초 안에 사장님 신규 탭에 떠요. **같은 브라우저의 다른 탭은 MSW 메모리를 공유하지 않으니** 시연할 때는 실제 백엔드를 쓰거나, 한 탭 안에서 로그아웃·로그인으로 역할을 바꿔 주세요.
 - `newowner@test.com`: 로그인하면 가게 등록 → 메뉴 등록 → 영업 시작 순서를 볼 수 있어요. 메뉴가 없으면 영업을 켤 수 없어요.
+
+### 라이더 데모 (MSW)
+
+- `rider@test.com`은 `#0042`를 **배달 중**인 상태로 시작해요 → 홈 배너 → [배달 완료] 하면 대기 중이 되고 수락할 수 있어요.
+- 수락 가능한 주문 `#0036`(홍콩반점), `#0037`(하루돈까스)이 있어요. 다 수락해서 목록이 비면 **20초 뒤 새 조리완료 주문**이 생겨요 (최대 3건).
+- 배달 중에는 [수락]과 퇴근 스위치가 꺼지고, [배달 완료]만 확인 창을 띄워요.
 
 ### 환경변수 (`.env.local`)
 
@@ -78,7 +85,7 @@ npm run dev                    # http://localhost:3000
 
 ## 화면 (25개)
 
-✅ 구현 / ⬜ 자리만 있음 (`PagePlaceholder`에 화면 시나리오 요약이 적혀 있음)
+25개 모두 구현했습니다 (MSW 가짜 API 기준).
 
 **손님 (10)** — 하단 탭: 홈 · 주문내역 · 내 정보
 
@@ -108,9 +115,9 @@ npm run dev                    # http://localhost:3000
 | | 주소 | 화면 |
 |---|---|---|
 | ✅ | `/rider/login` · `/rider/signup` | 라이더 로그인 · 회원가입 |
-| ⬜ | `/rider` | 출근 토글 + 수락 가능한 주문 |
-| ⬜ | `/rider/deliveries` · `/[id]` | 내 배달 · 배달 상세 ([픽업 완료] → [배달 완료]) |
-| ⬜ | `/rider/settlements` · `/[id]` | 정산 목록(+ 로그아웃) · 상세 |
+| ✅ | `/rider` | 출근 토글 + 수락 가능한 주문 (10초 폴링, 선착순) + 진행 중 배달 배너 |
+| ✅ | `/rider/deliveries` · `/[id]` | 내 배달(진행중/완료) · 배달 전표 ([픽업 완료] → [배달 완료]) |
+| ✅ | `/rider/settlements` · `/[id]` | 정산 목록(+ 로그아웃) · 상세 |
 
 **영상 우선 9개**: `/`, `/restaurants/[id]`, `/cart`, `/checkout/success`, `/orders/[id]`, `/owner`, `/rider`, `/rider/deliveries/[id]`, 로그인
 
@@ -169,11 +176,10 @@ app/
 │   ├── AppHeader, BottomTabBar, MobileShell, Button, StatusBadge, RoleBadge, LogoutButton
 │   ├── ticket/OrderTicket    # 주문 티켓 (손님·사장님·라이더 공통)
 │   ├── Modal, ConfirmDialog, QuantityStepper, PriceSummary, FoodImage, EmptyState, StateViews, FixedBottom
-│   ├── PagePlaceholder       # 아직 안 만든 화면의 자리
 │   └── tabs.ts               # 역할별 하단 탭 (react-icons/lu)
 │   ├── settlement/           # 정산 목록·상세 (사장님·라이더 공통)
 │   ├── Toaster, ToggleSwitch
-├── _hooks/queries/           # useMe, customer.ts, owner.ts
+├── _hooks/queries/           # useMe, customer.ts, owner.ts, rider.ts
 ├── _lib/
 │   ├── api/                  # client.ts(axios), authApi.ts
 │   ├── auth/                 # token.ts(역할 읽기), schemas.ts(zod)
@@ -242,7 +248,7 @@ app/
 
 ## API
 
-전체 명세는 **API 요청서**(36개)를 따릅니다. 지금 MSW로 만든 것은 인증 6개 + 손님 9개 + 사장님 11개 + 사진 업로드입니다.
+전체 명세는 **API 요청서**(36개)를 따릅니다. 지금 MSW로 만든 것은 인증 6개 + 손님 9개 + 사장님 11개 + 라이더 7개 + 사진 업로드입니다.
 
 | 번호 | 메서드 | 경로 | 비고 |
 |---|---|---|---|
@@ -262,6 +268,13 @@ app/
 | S2 | GET | `/api/owners/me/settlements` | 최신 주 먼저 |
 | S4 | GET | `/api/settlements/:id` | `items[]`에 `delivered_at` 포함. 본인 정산만 |
 | — | POST | `/api/uploads` | multipart `file` → `{ url }`. 5MB 이하 jpg·png |
+| R8 (추가) | GET | `/api/riders/me` | `{ rider_id, name, status }` — 홈의 출근 스위치·배달 중 표시용 |
+| R3 | PATCH | `/api/riders/me/status` | `{ status: "운행가능" \| "운행종료" }`. 배달 중이면 409 |
+| R4 | GET | `/api/deliveries/available` | 조리완료 + 배달 없음, 오래된 주문 먼저 |
+| R5 | POST | `/api/deliveries` | `{ order_id }`. 퇴근·배달 중·이미 다른 라이더 수락이면 409 |
+| R6 | GET | `/api/riders/me/deliveries` | 가게·주소·메뉴·배달비·`history[]` 포함. 배달 상세도 이 목록에서 찾음 |
+| R7 | PATCH | `/api/deliveries/:id/status` | `[픽업 완료]` → `{ status: "배달중" }` (픽업완료·배달중 이력 2개), `[배달 완료]` → `{ status: "배달완료" }`. 순서가 안 맞으면 409 |
+| S3 | GET | `/api/riders/me/settlements` | |
 | C1·O1·R1 | POST | `/api/{customers\|owners\|riders}/signup` | 이메일 중복 409. 점주는 phone 없음 |
 | C2·O2·R2 | POST | `/api/{customers\|owners\|riders}/login` | 토큰은 쿠키로. 점주는 `restaurant_id`(없으면 null) |
 | A1 | POST | `/api/auth/logout` | 쿠키 삭제 |
@@ -303,7 +316,8 @@ app/
 - [ ] 로그아웃·내 정보 API (A1·A2)
 - [ ] 토스 승인 후 주문 저장(C9), 거절 시 토스 결제 취소
 - [ ] 품절 메뉴 주문 거부, 점주 주문 목록에 손님 이름·전화번호 포함
-- [ ] [픽업 완료] 요청 하나로 `픽업완료`·`배달중` 이력 2개를 한 트랜잭션에
+- [ ] [픽업 완료] 요청 하나로 `픽업완료`·`배달중` 이력 2개를 한 트랜잭션에 (R7에 `status: "배달중"`으로 보냄)
+- [ ] **R8 `GET /api/riders/me` 추가** (요청서에 없던 것 — 라이더 홈에서 운행상태가 필요)
 - [ ] 정산 자동 생성·지급 스케줄러 + 시연용 수동 실행
 - [ ] 이미지 업로드 API `POST /api/uploads` (서버 `uploads/` 폴더 저장, DB엔 주소만)
 - [ ] O9~O11은 현재 상태가 맞지 않으면 409 + "이미 ○○ 상태인 주문이에요" (두 창에서 동시에 눌렀을 때)

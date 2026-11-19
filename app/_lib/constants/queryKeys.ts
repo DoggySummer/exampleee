@@ -10,4 +10,8 @@ export const queryKeys = {
   ownerOrders: ["owner", "orders"] as const,
   ownerSettlements: ["owner", "settlements"] as const,
   settlement: (id: number) => ["settlements", id] as const,
+  riderMe: ["rider", "me"] as const,
+  available: ["rider", "available"] as const,
+  myDeliveries: ["rider", "deliveries"] as const,
+  riderSettlements: ["rider", "settlements"] as const,
 };

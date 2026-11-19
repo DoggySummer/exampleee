@@ -122,17 +122,19 @@ addresses.push({ address_id: 3, customer_id: 2, address: "수원시 영통구 �
 /** 주문 한 건과 주문상세·결제·배달·이력을 같이 넣는다 */
 function seedOrder(o: {
   id: number; minutesAgo: number; status: Order["status"]; items: [number, number][];
-  delivery?: Delivery["status"]; deliveredMinutesAgo?: number;
+  delivery?: Delivery["status"]; deliveredMinutesAgo?: number; restaurant_id?: number;
 }) {
+  const rid = o.restaurant_id ?? 1;
+  const fee = restaurants.find((r) => r.restaurant_id === rid)!.delivery_fee;
   const lines = o.items.map(([menuId, q]) => ({ menu: menus.find((x) => x.menu_id === menuId)!, q }));
   const total = lines.reduce((s, l) => s + l.menu.price * l.q, 0);
-  orders.push({ order_id: o.id, customer_id: 2, restaurant_id: 1, ordered_time: ago(o.minutesAgo), status: o.status, address_id: 3, order_address: addr2, total_amount: total, delivery_fee: 3000 });
+  orders.push({ order_id: o.id, customer_id: 2, restaurant_id: rid, ordered_time: ago(o.minutesAgo), status: o.status, address_id: 3, order_address: addr2, total_amount: total, delivery_fee: fee });
   for (const l of lines) {
     orderItems.push({ order_item_id: orderItems.length + 1, order_id: o.id, menu_id: l.menu.menu_id, quantity: l.q, unit_price: l.menu.price });
   }
   const rejected = o.status === "거절";
-  payments.push({ payment_id: payments.length + 1, order_id: o.id, method: "카드", amount: total + 3000, status: rejected ? "취소완료" : "완료", canceled_at: rejected ? ago(o.minutesAgo - 1) : null, payment_key: `mock_pk_${o.id}`, toss_order_id: `seed-${o.id}` });
-  if (o.delivery) {
+  payments.push({ payment_id: payments.length + 1, order_id: o.id, method: "카드", amount: total + fee, status: rejected ? "취소완료" : "완료", canceled_at: rejected ? ago(o.minutesAgo - 1) : null, payment_key: `mock_pk_${o.id}`, toss_order_id: `seed-${o.id}` });
+    if (o.delivery) {
     const delivery_id = deliveries.length + 1;
     deliveries.push({ delivery_id, order_id: o.id, rider_id: 1, status: o.delivery });
     const done = o.deliveredMinutesAgo ?? o.minutesAgo - 40;
@@ -160,6 +162,10 @@ seedOrder({ id: 31, minutesAgo: sinceMonday + 2 * DAY, status: "조리완료", i
 seedOrder({ id: 30, minutesAgo: sinceMonday + 4 * DAY, status: "조리완료", items: [[5, 2]], delivery: "배달완료" });
 // 2주 전 배달완료 1건 → 지급까지 끝난 정산
 seedOrder({ id: 28, minutesAgo: sinceMonday + 10 * DAY, status: "조리완료", items: [[2, 3], [5, 1]], delivery: "배달완료" });
+
+// 라이더가 수락할 수 있는 주문 (조리완료, 배달 없음)
+seedOrder({ id: 36, minutesAgo: 14, status: "조리완료", items: [[6, 1], [8, 1]], restaurant_id: 2 });
+seedOrder({ id: 37, minutesAgo: 7, status: "조리완료", items: [[10, 2]], restaurant_id: 3 });
 
 /* ───── 정산 (매주 월요일 서버가 자동 생성) ───── */
 const ymd = (daysBeforeMonday: number) => {
@@ -192,6 +198,9 @@ seedSettlement({ id: 2, restaurant_id: 1, weeksAgo: 1, status: "생성완료", o
 seedSettlement({ id: 3, rider_id: 1, weeksAgo: 2, status: "지급완료", orderIds: [28] });
 seedSettlement({ id: 4, rider_id: 1, weeksAgo: 1, status: "생성완료", orderIds: [31, 30] });
 
+/** 라이더 운행상태. 라이더 1은 #0042를 배달 중 */
+const riderStatus: Record<number, "운행가능" | "배달중" | "운행종료"> = { 1: "배달중" };
+
 export const db = {
   users: [
     { id: 1, role: "customer", name: "김지민", email: "customer@test.com", password: "test1234", phone: "010-2345-6789" },
@@ -210,6 +219,7 @@ export const db = {
   deliveryHistory,
   settlements,
   settlementItems,
+  riderStatus,
 };
 
 /** 같은 역할 안에서만 이메일 중복 검사 (고객·점주·라이더 테이블이 따로라서) */
