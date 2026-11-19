@@ -347,3 +347,57 @@ app/
 - 역할별 경로·문구는 `_lib/constants/roles.ts`의 `ROLE_CONFIG`
 - 서버 컴포넌트에서 클라이언트 컴포넌트로 함수(아이콘 컴포넌트 등)를 넘기지 않음 → 이름이나 키만 넘김
 - 커밋 전 `npm run lint`, `npm run build` 통과
+
+## 토스페이먼츠 결제 (브랜치 `toss`)
+
+### 키 설정
+1. [토스페이먼츠 개발자센터](https://developers.tosspayments.com) 가입 → API 키 메뉴에서 **API 개별 연동 키** 확인 (`test_ck_…`, `test_sk_…`. 결제위젯 키 `gck/gsk`가 아님)
+2. `.env.local`에 넣는다 (git에 올라가지 않음)
+   ```
+   NEXT_PUBLIC_TOSS_CLIENT_KEY=test_ck_...
+   TOSS_SECRET_KEY=test_sk_...
+   ```
+3. 키가 없으면 장바구니가 예전처럼 **테스트 결제창(가짜)**을 띄운다. 키를 넣으면 진짜 토스 결제창이 열린다 (테스트 키라 돈은 안 나감)
+
+### 흐름
+```
+장바구니 [결제하기]
+  → 토스 결제창 (requestPayment, orderId = 프론트가 만든 UUID)
+  → 성공: /checkout/success?paymentKey&orderId&amount
+  → 프론트가 API 19 주문 생성 호출 { ..., paymentKey, toss_order_id, amount } + Idempotency-Key 헤더
+  → 백엔드가 토스 승인 API 호출 → 성공이면 주문 저장, 실패면 402
+  → 실패/취소: /checkout/fail?code&message (취소는 PAY_PROCESS_CANCELED)
+사장님 거절(API 22) → 백엔드가 토스 취소 API 호출 → 성공해야 거절 처리
+```
+
+### 백엔드 없이 개발할 때
+MSW 가짜 API가 백엔드 역할을 하고, 시크릿 키가 필요한 승인·취소만 Next 라우트
+`/api/toss/confirm`, `/api/toss/cancel`이 대신 호출한다 (`NEXT_PUBLIC_API_MOCKING=enabled`일 때만 동작).
+
+### 백엔드(Express) 구현 예시
+```js
+const auth = "Basic " + Buffer.from(process.env.TOSS_SECRET_KEY + ":").toString("base64");
+
+// API 19 주문 생성 안에서
+const r = await fetch("https://api.tosspayments.com/v1/payments/confirm", {
+  method: "POST",
+  headers: { Authorization: auth, "Content-Type": "application/json" },
+  body: JSON.stringify({ paymentKey, orderId: toss_order_id, amount }),
+});
+const toss = await r.json();
+if (!r.ok) return res.status(402).json({ message: toss.message });
+// 금액은 반드시 서버에서 다시 계산한 값과 비교할 것. toss.method = "카드" | "간편결제" ...
+
+// API 22 주문 거절 안에서
+await fetch(`https://api.tosspayments.com/v1/payments/${payment_key}/cancel`, {
+  method: "POST",
+  headers: { Authorization: auth, "Content-Type": "application/json" },
+  body: JSON.stringify({ cancelReason: "가게 사정으로 주문 거절" }),
+});
+```
+
+### 명세서에 반영할 것
+- API 19 요청에 `paymentKey`, `toss_order_id`, `amount` 추가, `Idempotency-Key` 헤더 = toss_order_id
+- API 22 거절 시 토스 결제 취소 → 성공해야 상태 변경
+- payments 테이블에 `payment_key`, `toss_order_id` 컬럼
+- 사장님·라이더에게 돈이 가는 것(지급대행)은 가맹 계약이 필요해 시연 불가 → 정산 내역은 우리 DB 화면으로 보여준다

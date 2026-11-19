@@ -11,9 +11,12 @@ import { PriceSummary } from "@/app/_components/PriceSummary";
 import { QuantityStepper } from "@/app/_components/QuantityStepper";
 import { LoadingRows } from "@/app/_components/StateViews";
 import { useAddresses, useRestaurant } from "@/app/_hooks/queries/customer";
+import { useMe } from "@/app/_hooks/queries/useMe";
 import { RESTAURANT_STATUS } from "@/app/_lib/constants/status";
 import { formatWon } from "@/app/_lib/utils/format";
+import { requestTossPayment, TOSS_ENABLED } from "@/app/_lib/payment/toss";
 import { savePendingCheckout } from "@/app/_lib/utils/pendingCheckout";
+import { toast } from "@/app/_stores/toastStore";
 import { useCart } from "@/app/_stores/cartStore";
 import { AddressFormSheet } from "../../_components/AddressFormSheet";
 import { MockPaymentSheet } from "./MockPaymentSheet";
@@ -48,6 +51,8 @@ function CartContent({ restaurantId }: { restaurantId: number }) {
   const [addrOpen, setAddrOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [tossOrderId, setTossOrderId] = useState("");
+  const [opening, setOpening] = useState(false);
+  const { data: me } = useMe();
 
   if (isPending || addrPending) return <LoadingRows rows={3} thumb={false} />;
   if (!r) return null;
@@ -72,8 +77,9 @@ function CartContent({ restaurantId }: { restaurantId: number }) {
   const blocked = closed ? "가게가 영업을 마쳐서 주문할 수 없어요" : soldOut.length ? "품절된 메뉴를 빼 주세요" : !addressId ? "배송지를 등록해 주세요" : null;
   const orderName = lines.length > 1 ? `${lines[0].name} 외 ${lines.length - 1}개` : lines[0].name;
 
-  function requestPayment() {
+  async function requestPayment() {
     if (blocked || !addressId) return;
+    // 토스 주문번호 = 서버의 Idempotency-Key. 결제 한 번에 하나
     const id = crypto.randomUUID();
     savePendingCheckout({
       toss_order_id: id,
@@ -83,8 +89,20 @@ function CartContent({ restaurantId }: { restaurantId: number }) {
       amount,
     });
     setTossOrderId(id);
-    // TODO(토스 연동): 클라이언트 키를 받으면 여기서 토스 SDK requestPayment({ orderId: id, amount, successUrl, failUrl }) 호출
-    setPayOpen(true);
+
+    if (!TOSS_ENABLED) {
+      // 토스 키가 없으면 테스트 결제창 (같은 successUrl·failUrl 흐름)
+      setPayOpen(true);
+      return;
+    }
+    setOpening(true);
+    try {
+      await requestTossPayment({ orderId: id, amount, orderName, customerName: me?.name });
+      // 성공하면 토스가 /checkout/success 로 이동시킨다
+    } catch (e) {
+      toast(e instanceof Error && e.message ? e.message : "결제창을 열지 못했어요. 잠시 후 다시 시도해 주세요.", "error");
+      setOpening(false);
+    }
   }
 
   return (
@@ -157,9 +175,10 @@ function CartContent({ restaurantId }: { restaurantId: number }) {
             <LuCircleAlert size={16} aria-hidden /> {blocked}
           </p>
         )}
-        <Button onClick={requestPayment} disabled={!!blocked}>
-          {formatWon(amount)} 결제하기
+        <Button onClick={requestPayment} disabled={!!blocked || opening}>
+          {opening ? "결제창을 여는 중…" : `${formatWon(amount)} 결제하기`}
         </Button>
+        {TOSS_ENABLED && <p className="mt-2 text-center text-xs text-muted">토스페이먼츠 테스트 결제 · 실제 돈은 나가지 않아요</p>}
       </FixedBottom>
 
       <AddressFormSheet open={addrOpen} onClose={() => setAddrOpen(false)} onSaved={(a) => setPicked(a.address_id)} />

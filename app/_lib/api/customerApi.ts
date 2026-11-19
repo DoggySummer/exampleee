@@ -31,7 +31,10 @@ export const deleteAddress = (id: number) => apiClient.delete(`/customers/me/add
 
 /** C9 토스 승인 + 주문 저장 */
 export const createOrder = (body: CreateOrderBody) =>
-  apiClient.post<CreateOrderResult>("/orders", body).then((r) => r.data);
+  apiClient
+    // 같은 결제로 두 번 요청돼도(새로고침·재전송) 주문은 하나만 생기도록 (API 명세서 19)
+    .post<CreateOrderResult>("/orders", body, { headers: { "Idempotency-Key": body.toss_order_id } })
+    .then((r) => r.data);
 /** C10 */
 export const getMyOrders = () =>
   apiClient.get<CustomerOrderSummary[]>("/customers/me/orders").then((r) => r.data);

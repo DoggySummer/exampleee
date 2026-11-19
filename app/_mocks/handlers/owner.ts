@@ -208,8 +208,20 @@ export const ownerHandlers = [
     const r = findMyOrder(request, Number(params.id));
     if (r instanceof Response) return r;
     if (r.order.status !== "접수대기") return conflict(r.order);
-    r.order.status = "거절";
     const pay = db.payments.find((p) => p.order_id === r.order.order_id)!;
+    // 진짜 토스 결제면 백엔드 대신 Next 라우트가 토스 결제 취소 API를 부른다. 취소가 실패하면 거절도 하지 않는다
+    if (!pay.payment_key.startsWith("mock_")) {
+      const res = await fetch("/api/toss/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentKey: pay.payment_key, cancelReason: "가게 사정으로 주문 거절" }),
+      });
+      if (!res.ok) {
+        const toss = (await res.json()) as { message?: string };
+        return err(502, `결제를 취소하지 못해서 거절하지 않았어요. ${toss.message ?? "다시 시도해 주세요."}`);
+      }
+    }
+    r.order.status = "거절";
     pay.status = "취소완료";
     pay.canceled_at = new Date().toISOString();
     return HttpResponse.json(toOwnerOrder(r.order));

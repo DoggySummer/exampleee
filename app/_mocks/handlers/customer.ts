@@ -151,9 +151,26 @@ export const customerHandlers = [
       return err(400, "결제 금액이 주문 금액과 달라요. 장바구니를 다시 확인해 주세요.");
     }
 
-    // 토스 승인 (가짜): paymentKey가 mock_fail로 시작하면 승인 실패
-    const approved = !body.paymentKey.startsWith("mock_fail");
-    const method = body.paymentKey.startsWith("mock_easy") ? "간편결제" : "카드";
+    // 토스 승인
+    //  - 테스트 결제창(paymentKey가 mock_로 시작): 가짜 승인. mock_fail이면 승인 실패
+    //  - 진짜 토스 결제창: 백엔드 대신 Next 라우트(/api/toss/confirm)가 토스 승인 API를 부른다
+    let approved: boolean;
+    let method: "카드" | "간편결제";
+    let failMessage = "카드사에서 결제를 승인하지 않았어요. 다른 결제수단으로 다시 시도해 주세요.";
+    if (body.paymentKey.startsWith("mock_")) {
+      approved = !body.paymentKey.startsWith("mock_fail");
+      method = body.paymentKey.startsWith("mock_easy") ? "간편결제" : "카드";
+    } else {
+      const res = await fetch("/api/toss/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentKey: body.paymentKey, orderId: body.toss_order_id, amount }),
+      });
+      const toss = (await res.json()) as { method?: string; message?: string };
+      approved = res.ok;
+      method = toss.method === "간편결제" ? "간편결제" : "카드";
+      if (!res.ok && toss.message) failMessage = toss.message;
+    }
 
     const order: Order = {
       order_id: seq(db.orders, "order_id"),
@@ -188,7 +205,7 @@ export const customerHandlers = [
     });
 
     if (!approved) {
-      return err(402, "카드사에서 결제를 승인하지 않았어요. 다른 결제수단으로 다시 시도해 주세요.");
+      return err(402, failMessage);
     }
     trackOrder(order);
     const result: CreateOrderResult = {

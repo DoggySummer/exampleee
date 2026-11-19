@@ -7,6 +7,7 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 /** 토스 결제창을 닫았거나 인증에 실패하면 이 주소로 온다: ?code&message */
 export default async function Page({ searchParams }: PageProps<"/checkout/fail">) {
   const sp = await searchParams;
+  // 토스: 구매자가 결제창을 닫으면 PAY_PROCESS_CANCELED, 그 밖에는 message에 사유
   const canceled = one(sp.code) === "PAY_PROCESS_CANCELED";
   return (
     <>
