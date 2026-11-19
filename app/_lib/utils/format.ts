@@ -10,3 +10,29 @@ export function formatPhone(value: string) {
   if (d.length < 8) return `${d.slice(0, 3)}-${d.slice(3)}`;
   return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
 }
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** "14:32" */
+export function formatTime(iso: string) {
+  const d = new Date(iso);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** 오늘이면 "오늘 14:32", 아니면 "11월 16일 14:32" */
+export function formatDateTime(iso: string) {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  return `${sameDay ? "오늘" : `${d.getMonth() + 1}월 ${d.getDate()}일`} ${formatTime(iso)}`;
+}
+
+/** 배달비 0원은 "무료" */
+export function formatFee(n: number) {
+  return n === 0 ? "무료" : formatWon(n);
+}
+
+/** 주문번호 42 → "#0042" */
+export function formatOrderNo(id: number) {
+  return `#${String(id).padStart(4, "0")}`;
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -11,6 +12,7 @@ import { RoleBadge } from "@/app/_components/RoleBadge";
 import { ApiError } from "@/app/_lib/api/client";
 import { login } from "@/app/_lib/api/authApi";
 import { loginSchema, type LoginValues } from "@/app/_lib/auth/schemas";
+import { queryKeys } from "@/app/_lib/constants/queryKeys";
 import { ROLE_CONFIG, type Role } from "@/app/_lib/constants/roles";
 import { FormField } from "./FormField";
 
@@ -34,6 +36,7 @@ function safeNext(role: Role, next?: string) {
 export function LoginForm({ role, next, joinedEmail }: Props) {
   const cfg = ROLE_CONFIG[role];
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -48,6 +51,8 @@ export function LoginForm({ role, next, joinedEmail }: Props) {
     setServerError(null);
     try {
       const user = await login(role, values);
+      // 로그인 전 화면에서 "로그인 안 함"으로 캐시된 내 정보를 바로 바꾼다
+      queryClient.setQueryData(queryKeys.me, user);
       // 가게가 없는 점주는 가게 등록부터
       const dest =
         role === "owner" && user.restaurant_id === null

@@ -3,6 +3,7 @@ import { API_URL } from "@/app/_lib/api/client";
 import { ROLE_CONFIG, ROLES, TOKEN_COOKIE, type Role } from "@/app/_lib/constants/roles";
 import type { AuthUser, LoginBody, SignupBody } from "@/app/_lib/types/api";
 import { db, findUser, nextId, type MockUser } from "../data";
+import { readTokenUser } from "../session";
 
 const base = `${API_URL}/api`;
 
@@ -33,19 +34,6 @@ function toAuthUser(u: MockUser): AuthUser {
     name: u.name,
     ...(u.role === "owner" ? { restaurant_id: u.restaurant_id ?? null } : {}),
   };
-}
-
-function readTokenUser(): AuthUser | null {
-  const raw = document.cookie.split("; ").find((c) => c.startsWith(`${TOKEN_COOKIE}=`))?.split("=")[1];
-  if (!raw) return null;
-  try {
-    const json = new TextDecoder().decode(
-      Uint8Array.from(atob(raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)),
-    );
-    return JSON.parse(json) as AuthUser;
-  } catch {
-    return null;
-  }
 }
 
 const roleHandlers = (role: Role) => {

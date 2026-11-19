@@ -28,7 +28,16 @@ npm run dev                    # http://localhost:3000
 | 라이더 | `rider@test.com` | `/rider` 라이더 홈 |
 
 - 회원가입에서 `taken@test.com`을 쓰면 이메일 중복 오류(409)를 볼 수 있어요.
-- 가짜 DB는 메모리에 있어서 **새로고침하면 새로 가입한 계정은 사라져요.** 로그인 쿠키는 남습니다.
+- 가짜 DB는 메모리에 있어서 **새로고침하면 새로 가입한 계정·새 주문은 사라져요.** 로그인 쿠키와 장바구니는 남습니다.
+
+### 손님 데모 (MSW)
+
+- `customer@test.com`에는 예시 주문 3건이 있어요: `#0042` 배달중, `#0041` 거절(결제 취소), `#0040` 배달완료.
+- 결제는 **테스트 결제창**(토스 결제창 대신)에서 해요. "카드사 승인 실패로 테스트하기"를 체크하면 승인 실패 화면, [닫기]를 누르면 결제 취소 화면이 나와요.
+- 사장님·라이더 화면이 아직 없어서, 새로 한 주문은 **12초마다 자동으로 다음 단계**로 넘어가요 (접수 → 조리중 → 조리완료 → 배정 → 배달중 → 배달완료). `app/_mocks/progress.ts`의 `AUTO_PROGRESS`로 끕니다.
+- 품절 메뉴: 김밥천국 "돈까스김밥", 하루돈까스 "냉모밀". 영업종료 가게: 할매순대국. 배달비 무료: 바삭치킨.
+- 주문에 쓴 배송지(`광교중앙로 145`)를 지우면 409 오류가 나요.
+- 가게·메뉴 사진은 `public/mock/`의 임시 그림이에요.
 
 ### 환경변수 (`.env.local`)
 
@@ -68,12 +77,12 @@ npm run dev                    # http://localhost:3000
 | | 주소 | 화면 |
 |---|---|---|
 | ✅ | `/login` · `/signup` | 로그인 · 회원가입 (하단에 사장님·라이더 링크) |
-| ⬜ | `/` | 가게 목록 (로그인 없이 볼 수 있음) |
-| ⬜ | `/restaurants/[id]` | 가게 상세 + 메뉴 + 장바구니 담기 |
-| ⬜ | `/cart` | 장바구니 · 배송지 선택 · 결제하기 |
-| ⬜ | `/checkout/success` · `/checkout/fail` | 토스 결제 성공 처리 · 실패 안내 |
-| ⬜ | `/orders` · `/orders/[id]` | 주문 내역 · 주문 상세 (5단계 타임라인) |
-| ⬜ | `/my/addresses` | 배송지 관리 + 로그아웃 |
+| ✅ | `/` | 가게 목록 (로그인 없이 볼 수 있음, 로그인하면 배달 주소 배너·장바구니 버튼) |
+| ✅ | `/restaurants/[id]` | 가게 상세 + 메뉴 + 장바구니 담기 (품절·영업종료·다른 가게 확인창) |
+| ✅ | `/cart` | 장바구니 · 배송지 선택·등록 · 결제하기 (테스트 결제창) |
+| ✅ | `/checkout/success` · `/checkout/fail` | 결제 승인·주문 저장 → 주문 상세로 / 취소·실패 안내 |
+| ✅ | `/orders` · `/orders/[id]` | 주문 내역 · 주문 상세 (티켓 + 5단계 타임라인, 10초 폴링) |
+| ✅ | `/my/addresses` | 배송지 추가·수정·삭제 + 로그아웃 |
 
 **사장님 (8)** — 하단 탭: 주문 · 메뉴 · 정산 · 가게
 
@@ -150,15 +159,19 @@ app/
 ├── _components/              # 공통 컴포넌트
 │   ├── auth/                 # LoginForm, SignupForm, FormField, AuthPages
 │   ├── AppHeader, BottomTabBar, MobileShell, Button, StatusBadge, RoleBadge, LogoutButton
+│   ├── ticket/OrderTicket    # 주문 티켓 (손님·사장님·라이더 공통)
+│   ├── Modal, ConfirmDialog, QuantityStepper, PriceSummary, FoodImage, EmptyState, StateViews, FixedBottom
 │   ├── PagePlaceholder       # 아직 안 만든 화면의 자리
 │   └── tabs.ts               # 역할별 하단 탭 (react-icons/lu)
+├── _hooks/queries/           # useMe, 손님 쿼리 훅 (customer.ts)
 ├── _lib/
 │   ├── api/                  # client.ts(axios), authApi.ts
 │   ├── auth/                 # token.ts(역할 읽기), schemas.ts(zod)
-│   ├── constants/            # status.ts, polling.ts, roles.ts
+│   ├── constants/            # status.ts, polling.ts, roles.ts, queryKeys.ts
 │   ├── types/                # db.ts(테이블 기준), api.ts
-│   └── utils/                # formatWon, formatPhone
-├── _mocks/                   # MSW (data.ts = 가짜 DB, handlers/)
+│   └── utils/                # format(금액·시각·주문번호), orderStep(손님 5단계), pendingCheckout
+├── _stores/                  # cartStore (zustand + localStorage)
+├── _mocks/                   # MSW (data.ts = 가짜 DB, handlers/, progress.ts = 데모 자동 진행)
 ├── _providers/               # QueryClient, MSW
 ├── (auth)/login, signup      # 손님 로그인·가입 (탭 없음)
 ├── (customer)/               # 손님 화면 (URL에 (customer) 안 붙음)
@@ -218,16 +231,35 @@ app/
 
 ## API
 
-전체 명세는 **API 요청서**(36개)를 따릅니다. 지금 MSW로 만든 것은 인증 6개입니다.
+전체 명세는 **API 요청서**(36개)를 따릅니다. 지금 MSW로 만든 것은 인증 6개 + 손님 9개입니다.
 
 | 번호 | 메서드 | 경로 | 비고 |
 |---|---|---|---|
+| C7 | GET | `/api/restaurants` | 로그인 없이 |
+| C8 | GET | `/api/restaurants/:id` | 가게 + `menus[]` (`image_url`, `is_sold_out` 포함) |
+| C3·C4 | GET·POST | `/api/customers/me/addresses` | |
+| C5·C6 | PATCH·DELETE | `/api/customers/me/addresses/:id` | 주문에 쓴 배송지 삭제는 409 |
+| C9 | POST | `/api/orders` | 토스 승인 + 주문 저장. 아래 참고 |
+| C10 | GET | `/api/customers/me/orders` | 최신순, 결제실패 제외, `delivery_status` 포함 |
+| C11 | GET | `/api/orders/:id` | `items[]`, `payment`, `delivery{status, history[]}` 포함 |
 | C1·O1·R1 | POST | `/api/{customers\|owners\|riders}/signup` | 이메일 중복 409. 점주는 phone 없음 |
 | C2·O2·R2 | POST | `/api/{customers\|owners\|riders}/login` | 토큰은 쿠키로. 점주는 `restaurant_id`(없으면 null) |
 | A1 | POST | `/api/auth/logout` | 쿠키 삭제 |
 | A2 | GET | `/api/auth/me` | `{ role, id, name }` |
 
 에러 응답은 `{ "message": "..." }` + 상태코드이고, 화면은 `message`를 그대로 보여 줍니다.
+
+### 결제 흐름 (C9)
+
+1. 장바구니에서 [결제하기] → `toss_order_id`(UUID)를 만들고 주문 정보를 sessionStorage에 잠깐 저장
+2. 결제창 → 성공하면 `/checkout/success?paymentKey&orderId&amount`, 닫거나 실패하면 `/checkout/fail?code&message`
+3. 성공 페이지가 `POST /api/orders { restaurant_id, address_id, items[{menu_id, quantity}], paymentKey, toss_order_id, amount }`
+4. 서버: 영업중·품절·배송지·금액(메뉴 합계 + 배달비 = amount) 검사 → 토스 승인 → 주문·주문상세·결제를 한 트랜잭션으로 저장
+   - 승인 실패: `결제실패`·`실패`로 저장하고 **402** + 사유
+   - 같은 `toss_order_id`로 다시 오면(새로고침) 이미 만든 주문을 그대로 돌려줌
+5. 성공하면 장바구니를 비우고 `/orders/:id`로 이동
+
+> **토스 연동 TODO**: 지금은 `cart/_components/MockPaymentSheet.tsx`가 결제창을 흉내 냅니다. 토스 클라이언트 키를 받으면 `CartView.requestPayment()`에서 토스 SDK `requestPayment({ orderId, amount, successUrl, failUrl })`를 부르도록 바꾸면 됩니다. 나머지 흐름(성공·실패 페이지, C9)은 그대로 씁니다.
 
 ### 폴링 (`_lib/constants/polling.ts`)
 
