@@ -1,16 +1,12 @@
-import { format } from "date-fns";
-
-/** 27000 → "27,000원" (₩ 기호 쓰지 않음) */
-export function formatWon(amount: number) {
-  return `${amount.toLocaleString("ko-KR")}원`;
+/** 27000 → "27,000원" */
+export function formatWon(n: number) {
+  return `${n.toLocaleString("ko-KR")}원`;
 }
 
-/** ISO 문자열 → "18:42" */
-export function formatTime(iso: string) {
-  return format(new Date(iso), "HH:mm");
-}
-
-/** 결제금액 = 주문금액 + 배달비 (DB 규칙 ⑤) */
-export function getPaymentAmount(totalAmount: number, deliveryFee: number) {
-  return totalAmount + deliveryFee;
+/** 숫자만 입력해도 010-1234-5678 형태로 맞춘다 */
+export function formatPhone(value: string) {
+  const d = value.replace(/\D/g, "").slice(0, 11);
+  if (d.length < 4) return d;
+  if (d.length < 8) return `${d.slice(0, 3)}-${d.slice(3)}`;
+  return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
 }

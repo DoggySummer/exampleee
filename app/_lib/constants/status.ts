@@ -1,66 +1,87 @@
 /**
- * 상태값 — DB 최종 규칙 기준. DB에 한글 VARCHAR로 저장되므로 한글 그대로 사용한다.
- * 상태 문자열은 반드시 이 파일의 상수/타입을 통해서만 사용할 것 (직접 "접수대기" 타이핑 금지).
+ * DB에 저장되는 상태값 (확인사항.txt 2. 상태값 최종)
+ * 화면에서 "접수대기" 같은 문자열을 직접 쓰지 말고 여기서 가져다 쓴다.
  */
+export const ORDER_STATUS = {
+  PAYMENT_FAILED: "결제실패",
+  PENDING: "접수대기",
+  COOKING: "조리중",
+  COOKED: "조리완료",
+  REJECTED: "거절",
+} as const;
 
-export const ORDER_STATUS = ["결제실패", "접수대기", "조리중", "조리완료", "거절"] as const;
-export const PAYMENT_STATUS = ["완료", "실패", "취소완료"] as const;
-export const PAYMENT_METHOD = ["카드", "간편결제"] as const;
-export const DELIVERY_STATUS = ["배정완료", "픽업완료", "배달중", "배달완료"] as const;
-export const RIDER_STATUS = ["운행가능", "배달중", "운행종료"] as const;
-export const STORE_STATUS = ["영업중", "영업종료"] as const;
-export const SETTLEMENT_STATUS = ["생성완료", "지급완료"] as const;
+export const PAYMENT_STATUS = {
+  DONE: "완료",
+  FAILED: "실패",
+  CANCELED: "취소완료",
+} as const;
 
-export type OrderStatus = (typeof ORDER_STATUS)[number];
-export type PaymentStatus = (typeof PAYMENT_STATUS)[number];
-export type PaymentMethod = (typeof PAYMENT_METHOD)[number];
-export type DeliveryStatus = (typeof DELIVERY_STATUS)[number];
-export type RiderStatus = (typeof RIDER_STATUS)[number];
-export type StoreStatus = (typeof STORE_STATUS)[number];
-export type SettlementStatus = (typeof SETTLEMENT_STATUS)[number];
+export const PAYMENT_METHOD = {
+  CARD: "카드",
+  EASY_PAY: "간편결제",
+} as const;
 
-/** 점주가 직접 바꿀 수 있는 다음 주문상태 (거절은 별도 API) */
-export const NEXT_ORDER_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
-  접수대기: "조리중",
-  조리중: "조리완료",
+/** 배정완료 → 픽업완료 → 배달중 → 배달완료 (라이더의 [픽업 완료] 버튼은 픽업완료·배달중을 한 번에 기록) */
+export const DELIVERY_STATUS = {
+  ASSIGNED: "배정완료",
+  PICKED_UP: "픽업완료",
+  DELIVERING: "배달중",
+  DELIVERED: "배달완료",
+} as const;
+
+export const RIDER_STATUS = {
+  AVAILABLE: "운행가능",
+  BUSY: "배달중",
+  OFF: "운행종료",
+} as const;
+
+export const RESTAURANT_STATUS = {
+  OPEN: "영업중",
+  CLOSED: "영업종료",
+} as const;
+
+export const SETTLEMENT_STATUS = {
+  CREATED: "생성완료",
+  PAID: "지급완료",
+} as const;
+
+type ValueOf<T> = T[keyof T];
+export type OrderStatus = ValueOf<typeof ORDER_STATUS>;
+export type PaymentStatus = ValueOf<typeof PAYMENT_STATUS>;
+export type PaymentMethod = ValueOf<typeof PAYMENT_METHOD>;
+export type DeliveryStatus = ValueOf<typeof DELIVERY_STATUS>;
+export type RiderStatus = ValueOf<typeof RIDER_STATUS>;
+export type RestaurantStatus = ValueOf<typeof RESTAURANT_STATUS>;
+export type SettlementStatus = ValueOf<typeof SETTLEMENT_STATUS>;
+
+/**
+ * 배지 톤. 강조색은 초록 하나라서 톤은 세 가지뿐이다.
+ * - active: 진행 중이거나 끝난 정상 상태 (초록)
+ * - waiting: 누군가의 행동을 기다리는 상태 (회색)
+ * - danger: 거절·실패 (빨강)
+ */
+export type StatusTone = "active" | "waiting" | "danger";
+
+export const STATUS_TONE: Record<string, StatusTone> = {
+  [ORDER_STATUS.PENDING]: "waiting",
+  [ORDER_STATUS.COOKING]: "active",
+  [ORDER_STATUS.COOKED]: "active",
+  [ORDER_STATUS.REJECTED]: "danger",
+  [ORDER_STATUS.PAYMENT_FAILED]: "danger",
+  [DELIVERY_STATUS.ASSIGNED]: "active",
+  [DELIVERY_STATUS.PICKED_UP]: "active",
+  [DELIVERY_STATUS.DELIVERING]: "active",
+  [DELIVERY_STATUS.DELIVERED]: "active",
+  [RESTAURANT_STATUS.OPEN]: "active",
+  [RESTAURANT_STATUS.CLOSED]: "waiting",
+  [RIDER_STATUS.AVAILABLE]: "active",
+  [RIDER_STATUS.OFF]: "waiting",
+  [SETTLEMENT_STATUS.CREATED]: "waiting",
+  [SETTLEMENT_STATUS.PAID]: "active",
 };
 
-/** 배달상태는 순서대로만 변경 (재배정·역행 없음) */
-export const NEXT_DELIVERY_STATUS: Partial<Record<DeliveryStatus, DeliveryStatus>> = {
-  배정완료: "픽업완료",
-  픽업완료: "배달중",
-  배달중: "배달완료",
-};
-
-/** 상태 → 색 톤 (StatusBadge에서 사용) */
-export type StatusTone = "waiting" | "progress" | "success" | "danger" | "neutral";
-
-export const STATUS_TONE: Record<
-  OrderStatus | PaymentStatus | DeliveryStatus | RiderStatus | StoreStatus | SettlementStatus,
-  StatusTone
-> = {
-  // 주문
-  결제실패: "danger",
-  접수대기: "waiting",
-  조리중: "progress",
-  조리완료: "success",
-  거절: "danger",
-  // 결제
-  완료: "success",
-  실패: "danger",
-  취소완료: "danger",
-  // 배달 (배달중은 라이더 운행상태와 같은 문자열 → progress)
-  배정완료: "waiting",
-  픽업완료: "progress",
-  배달중: "progress",
-  배달완료: "success",
-  // 라이더
-  운행가능: "success",
-  운행종료: "neutral",
-  // 음식점
-  영업중: "success",
-  영업종료: "neutral",
-  // 정산
-  생성완료: "waiting",
-  지급완료: "success",
+/** 정산 상태는 화면에서 이렇게 바꿔 보여 준다 */
+export const SETTLEMENT_LABEL: Record<SettlementStatus, string> = {
+  [SETTLEMENT_STATUS.CREATED]: "지급 예정",
+  [SETTLEMENT_STATUS.PAID]: "지급 완료",
 };

@@ -1,15 +1,21 @@
-import { Suspense } from "react";
-import { LoadingList } from "@/app/_components/LoadingList";
-import { RestaurantDetail } from "./_components/RestaurantDetail";
+import { AppHeader } from "@/app/_components/AppHeader";
+import { PagePlaceholder } from "@/app/_components/PagePlaceholder";
 
-/**
- * Cache Components 규칙: params(요청 시점 값)는 Suspense 안쪽 컴포넌트에서 읽는다.
- * 페이지는 params Promise를 그대로 넘기고, 클라이언트 컴포넌트에서 use()로 꺼낸다.
- */
-export default function RestaurantPage({ params }: PageProps<"/restaurants/[id]">) {
+export default async function Page({ params }: PageProps<"/restaurants/[id]">) {
+  const { id } = await params;
   return (
-    <Suspense fallback={<LoadingList rows={6} />}>
-      <RestaurantDetail params={params} />
-    </Suspense>
+    <>
+      <AppHeader title={`가게 상세 #${id}`} back="/" />
+      <PagePlaceholder
+        summary="가게 정보 + 메뉴 + 장바구니 담기"
+        items={[
+          "메뉴: 사진(선택), 이름, 가격. 품절 메뉴는 회색 + 담기 불가",
+          "다른 가게 메뉴를 담으면 \"장바구니를 비울까요?\" 확인",
+          "영업종료면 담기 버튼 비활성",
+          "하단 고정 바: 장바구니 n개 · 금액 보기",
+          "담기부터 로그인 필요 → 로그인 후 이 화면으로 돌아옴"
+        ]}
+      />
+    </>
   );
 }

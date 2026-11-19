@@ -1,366 +1,282 @@
-# 배달앱 프론트엔드 (3조)
+# 동네배달(가칭) 프론트엔드 — 3조
 
-고객이 음식점 메뉴를 주문하면 점주가 조리하고, 라이더가 배달하고, 정산까지 이어지는 배달앱의 프론트엔드입니다.
-**모든 화면(고객·점주·라이더)은 모바일 기준**으로 만듭니다.
+손님이 주문하면 사장님이 조리하고, 라이더가 배달하고, 정산까지 이어지는 배달앱의 프론트엔드입니다.
+**모든 화면은 모바일 기준**(최대 480px)이고, 영상으로 제출하기 때문에 배포는 하지 않습니다.
 
-- 백엔드(Express + MySQL)는 아직 없음 → **MSW로 가짜 API**를 띄워 개발
-- DB 규칙은 `3조 DB 최종 규칙 정리`와 테이블 정의서를 따름
+- 백엔드(Express + MySQL)는 따로 개발 중 → 그 전까지 **MSW 가짜 API**로 개발
+- 기준 문서: `확인사항.txt`(DB 최종 규칙), 테이블 정의서, API 요청서, 화면 시나리오 (2026-11-19 확정)
 
 ---
 
-## 실행 방법
+## 실행
 
 ```bash
-npm install            # 패키지가 추가됐으므로 처음 한 번 꼭 실행
-cp .env.example .env.local   # Windows: copy .env.example .env.local (이미 있으면 생략)
-npm run dev
+npm install
+cp .env.example .env.local     # Windows: copy .env.example .env.local
+npm run dev                    # http://localhost:3000
 ```
 
-| 주소 | 화면 |
-|---|---|
-| http://localhost:3000 | 고객 · 음식점 목록 |
-| http://localhost:3000/restaurants/1 | 고객 · 메뉴 (홍콩반점) |
-| http://localhost:3000/cart | 고객 · 장바구니 |
-| http://localhost:3000/owner/orders | 점주 · 주문 관리 |
+브라우저 개발자도구에서 모바일 화면(예: iPhone 14, 390px)으로 보세요.
 
-> 브라우저 개발자도구에서 모바일 화면(예: iPhone 14, 390px)으로 보는 것을 권장합니다.
-> MSW 데모: 점주 주문 관리 화면을 켜 두면 **30초 뒤 새 주문**이 들어오고, 조리완료 주문은 **20초 뒤 라이더가 배정**됩니다. 새로고침하면 가짜 데이터가 초기화됩니다.
+### 테스트 계정 (MSW, 비밀번호 모두 `test1234`)
 
-### 스크립트
+| 역할 | 이메일 | 로그인 후 |
+|---|---|---|
+| 손님 | `customer@test.com` | `/` 가게 목록 |
+| 사장님 (가게 있음) | `owner@test.com` | `/owner` 주문 관리 |
+| 사장님 (가게 없음) | `newowner@test.com` | `/owner/restaurant/new` 가게 등록 |
+| 라이더 | `rider@test.com` | `/rider` 라이더 홈 |
 
-| 명령 | 설명 |
-|---|---|
-| `npm run dev` | 개발 서버 |
-| `npm run build` | 프로덕션 빌드 (커밋 전 확인) |
-| `npm run lint` | ESLint |
-| `npx next typegen` | `PageProps`, `LayoutProps` 타입 생성 (dev/build 시 자동) |
+- 회원가입에서 `taken@test.com`을 쓰면 이메일 중복 오류(409)를 볼 수 있어요.
+- 가짜 DB는 메모리에 있어서 **새로고침하면 새로 가입한 계정은 사라져요.** 로그인 쿠키는 남습니다.
 
 ### 환경변수 (`.env.local`)
 
 | 이름 | 예시 | 설명 |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | `http://localhost:4000` | Express 서버 주소 (백엔드와 합의 후 수정) |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:4000` | Express 서버 주소. API는 `이 주소/api/...`로 호출 |
 | `NEXT_PUBLIC_API_MOCKING` | `enabled` / `disabled` | `enabled`면 MSW 가짜 API 사용 |
 
-- `.env.local`은 Git에 올리지 않습니다. 공유용은 `.env.example`.
-- `NEXT_PUBLIC_` 값은 빌드 시 코드에 들어가므로 **바꾸면 `npm run dev`를 재시작**해야 합니다.
+`NEXT_PUBLIC_` 값을 바꾸면 `npm run dev`를 다시 켜야 합니다.
 
 ---
 
 ## 기술 스택
 
-| 분류 | 사용 | 버전 |
-|---|---|---|
-| 프레임워크 | Next.js (App Router, Turbopack, **Cache Components 켜짐**) | 16.4 |
-| 언어 | TypeScript | 5 |
-| 스타일 | Tailwind CSS (`@theme` 디자인 토큰) | 4.3 |
-| 서버 상태 | TanStack Query | 5 |
-| 클라이언트 상태 | Zustand (장바구니, 토스트) | 5 |
-| HTTP | axios | 1 |
-| 가짜 API | MSW | 3 |
-| 아이콘 | lucide-react | 1 |
-| 글꼴 | Pretendard (Variable, `next/font/local`) | 1.3 |
-| 날짜 | date-fns | 4 |
-| 폼 (설치만, 아직 미사용) | react-hook-form, zod, @hookform/resolvers | 7 / 4 / 7 |
+| 분류 | 사용 |
+|---|---|
+| 프레임워크 | Next.js 16 (App Router, Turbopack) |
+| 언어 | TypeScript 5 |
+| 스타일 | Tailwind CSS 4 (`@theme` 디자인 토큰) |
+| 서버 상태 | TanStack Query 5 |
+| 클라이언트 상태 | Zustand 5 (장바구니 등) |
+| 폼 | react-hook-form + zod |
+| HTTP | axios (`withCredentials: true`) |
+| 가짜 API | MSW 3 (옵션 이름 `onUnhandledFrame`) |
+| 아이콘 | react-icons — **Lucide 세트(`react-icons/lu`)만** |
+| 글꼴 | Wanted Sans Variable (`next/font/local`) |
+| 인증 | JWT를 httpOnly 쿠키로, 페이지 접근은 `proxy.ts` |
 
-> MSW 3은 2와 옵션 이름이 다릅니다: `onUnhandledRequest` → **`onUnhandledFrame`**
+---
+
+## 화면 (25개)
+
+✅ 구현 / ⬜ 자리만 있음 (`PagePlaceholder`에 화면 시나리오 요약이 적혀 있음)
+
+**손님 (10)** — 하단 탭: 홈 · 주문내역 · 내 정보
+
+| | 주소 | 화면 |
+|---|---|---|
+| ✅ | `/login` · `/signup` | 로그인 · 회원가입 (하단에 사장님·라이더 링크) |
+| ⬜ | `/` | 가게 목록 (로그인 없이 볼 수 있음) |
+| ⬜ | `/restaurants/[id]` | 가게 상세 + 메뉴 + 장바구니 담기 |
+| ⬜ | `/cart` | 장바구니 · 배송지 선택 · 결제하기 |
+| ⬜ | `/checkout/success` · `/checkout/fail` | 토스 결제 성공 처리 · 실패 안내 |
+| ⬜ | `/orders` · `/orders/[id]` | 주문 내역 · 주문 상세 (5단계 타임라인) |
+| ⬜ | `/my/addresses` | 배송지 관리 + 로그아웃 |
+
+**사장님 (8)** — 하단 탭: 주문 · 메뉴 · 정산 · 가게
+
+| | 주소 | 화면 |
+|---|---|---|
+| ✅ | `/owner/login` · `/owner/signup` | 사장님 로그인 · 회원가입 |
+| ⬜ | `/owner` | 주문 관리 (신규/조리중/완료 탭) |
+| ⬜ | `/owner/restaurant/new` | 가게 등록 (가게가 없을 때) |
+| ⬜ | `/owner/restaurant` | 가게 정보 + 로그아웃 |
+| ⬜ | `/owner/menus` | 메뉴 목록·추가·수정·품절 |
+| ⬜ | `/owner/settlements` · `/[id]` | 정산 목록 · 상세 |
+
+**라이더 (7)** — 하단 탭: 홈 · 내 배달 · 정산
+
+| | 주소 | 화면 |
+|---|---|---|
+| ✅ | `/rider/login` · `/rider/signup` | 라이더 로그인 · 회원가입 |
+| ⬜ | `/rider` | 출근 토글 + 수락 가능한 주문 |
+| ⬜ | `/rider/deliveries` · `/[id]` | 내 배달 · 배달 상세 ([픽업 완료] → [배달 완료]) |
+| ⬜ | `/rider/settlements` · `/[id]` | 정산 목록(+ 로그아웃) · 상세 |
+
+**영상 우선 9개**: `/`, `/restaurants/[id]`, `/cart`, `/checkout/success`, `/orders/[id]`, `/owner`, `/rider`, `/rider/deliveries/[id]`, 로그인
+
+---
+
+## 확정한 결정 (2026-11-19)
+
+**범위**
+- 리뷰·쿠폰·메뉴옵션 없음. 가게 검색·정렬 없음. 소셜 로그인 없음.
+- 결제는 토스페이먼츠 테스트 결제. 승인은 백엔드가 하고, 승인되면 주문·주문상세·결제를 한 번에 저장 (결제대기 없음).
+- 손님 직접 취소 없음. 사장님이 거절하면 결제 자동 취소.
+- 정산은 서버가 매주 월요일 자동 생성·지급. 관리자 계정 없음 (시연용 수동 실행만 백엔드에 둠).
+
+**손님**
+- 로그인 없이 가게·메뉴를 볼 수 있고, 담기부터 로그인.
+- 장바구니는 localStorage에 저장, 한 가게 메뉴만. 기본 배송지는 마지막 주문에 쓴 배송지.
+- 주문 상세는 주문상태 + 배달상태를 합쳐 5단계 타임라인으로. 라이더 정보는 보여 주지 않음.
+- 가게·메뉴 사진 있음. 품절 메뉴는 회색 + 담기 불가.
+
+**사장님**
+- 메뉴 삭제 대신 품절 토글. 판매 가능한 메뉴가 0개면 영업 시작 불가.
+- 가게 대표 사진 필수, 메뉴 사진 선택.
+- 주문 카드에 손님 이름·전화번호 표시.
+- 새 주문: 10초 폴링 + 알림음 + "새 주문 n건" 팝업. 폴링은 `owner/(main)/layout.tsx`에서 (메뉴·정산 화면에서도 알림).
+  브라우저는 첫 클릭 전에 소리를 막으므로 영업 토글을 켤 때 소리를 활성화.
+
+**라이더**
+- 수락은 확인 창 없이 바로 (선착순). 배달 상세에 손님 정보 없음.
+- [픽업 완료] 한 번에 `픽업완료`·`배달중` 이력을 같이 기록 → 버튼은 [픽업 완료] → [배달 완료] 두 번.
+- 오늘 건수·수입 표시 없음. 가게 전화번호 없음.
+
+---
+
+## 인증 흐름
+
+1. 로그인 API(`/api/customers|owners|riders/login`)가 성공하면 서버가 `token` 쿠키(httpOnly, SameSite=Lax)를 심음. 응답 본문에는 `role`·`id`·`name`만.
+2. 이후 요청은 브라우저가 쿠키를 자동으로 보냄 (`withCredentials: true`).
+3. `proxy.ts`가 토큰의 `role`만 읽어서 페이지 접근을 막음. 서명 검증은 Express가 매 요청마다 함.
+   - 로그인 안 했거나 다른 역할이면 → 그 역할의 로그인 화면으로, `?next=원래주소`를 붙여서.
+   - 로그인·회원가입 화면, `/`, `/restaurants/*`는 누구나 들어감.
+4. 로그아웃은 `POST /api/auth/logout` (httpOnly 쿠키는 프론트가 못 지움).
+
+> MSW는 httpOnly 쿠키를 만들 수 없어서 가짜 API에서만 `document.cookie`로 넣습니다. 실제 서버에서는 `Set-Cookie`로 받습니다.
 
 ---
 
 ## 폴더 구조
 
-`src/` 없이 `app/` 안에서 해결합니다. 밑줄(`_`)로 시작하는 폴더는 라우트가 되지 않습니다(Private Folder).
+`src/` 없이 `app/`에서 해결합니다. `_`로 시작하는 폴더는 라우트가 되지 않습니다.
 
 ```
+proxy.ts                      # 역할별 접근 제어 (Next.js 16에서 middleware.ts → proxy.ts)
 app/
-├── _components/        # 전역 공통 컴포넌트 (Button, StatusBadge, BottomTabBar ...)
-├── _hooks/queries/     # TanStack Query 훅 (useRestaurants, useOwnerOrders ...)
+├── _components/              # 공통 컴포넌트
+│   ├── auth/                 # LoginForm, SignupForm, FormField, AuthPages
+│   ├── AppHeader, BottomTabBar, MobileShell, Button, StatusBadge, RoleBadge, LogoutButton
+│   ├── PagePlaceholder       # 아직 안 만든 화면의 자리
+│   └── tabs.ts               # 역할별 하단 탭 (react-icons/lu)
 ├── _lib/
-│   ├── api/            # axios 인스턴스 + 도메인별 API 함수
-│   ├── constants/      # status.ts(상태값), polling.ts(폴링 주기), queryKeys.ts
-│   ├── types/          # DB 테이블 기준 타입
-│   └── utils/          # formatWon, cn ...
-├── _mocks/             # MSW (data.ts = 가짜 DB, handlers/)
-├── _providers/         # QueryClient, MSW
-├── _stores/            # Zustand (cartStore, toastStore)
-│
-├── (customer)/         # 고객 — URL에 (customer) 안 붙음
-│   ├── page.tsx                    /                 음식점 목록
-│   ├── restaurants/[id]/page.tsx   /restaurants/1    메뉴 + 장바구니 담기
-│   ├── cart/page.tsx               /cart             장바구니
-│   ├── orders/page.tsx             /orders           (다음 작업)
-│   └── me/page.tsx                 /me               (다음 작업)
-├── owner/              # 점주
-│   ├── orders/page.tsx             /owner/orders     주문 관리
-│   ├── menus/ settlements/ store/                    (다음 작업)
-│   (/owner 접속 시 /owner/orders 로 이동 — next.config.ts redirects)
-├── layout.tsx          # 폰트, viewport, Provider
-└── globals.css         # 디자인 토큰
+│   ├── api/                  # client.ts(axios), authApi.ts
+│   ├── auth/                 # token.ts(역할 읽기), schemas.ts(zod)
+│   ├── constants/            # status.ts, polling.ts, roles.ts
+│   ├── types/                # db.ts(테이블 기준), api.ts
+│   └── utils/                # formatWon, formatPhone
+├── _mocks/                   # MSW (data.ts = 가짜 DB, handlers/)
+├── _providers/               # QueryClient, MSW
+├── (auth)/login, signup      # 손님 로그인·가입 (탭 없음)
+├── (customer)/               # 손님 화면 (URL에 (customer) 안 붙음)
+├── owner/login, signup       # 사장님 로그인·가입
+├── owner/(main)/             # 로그인한 사장님 화면 (하단 탭 + 새 주문 감시)
+├── rider/login, signup
+└── rider/(main)/
 ```
 
 - 여러 화면이 같이 쓰는 것 → `app/_components`, `app/_lib`
-- 한 화면에서만 쓰는 것 → 그 라우트 폴더 안 `_components` (예: `owner/orders/_components/OwnerOrderCard.tsx`)
-
----
-
-## 컨벤션
-
-### Git
-
-**브랜치**: `main` + 작업 브랜치. 이름은 `타입/범위-내용` (소문자 kebab-case)
-
-```
-feat/owner-order-board
-fix/customer-cart-total
-ui/design-tokens
-chore/msw-setup
-```
-
-- 브랜치 하나 = 화면 하나 또는 기능 하나
-- 끝나면 main에 머지하고 브랜치 삭제
-
-**커밋 메시지**
-
-```
-<타입>(<범위>): <제목>
-
-<본문 - 선택, "왜" 바꿨는지>
-```
-
-| 타입 | 언제 |
-|---|---|
-| `feat` | 새 기능, 새 화면 |
-| `fix` | 버그 수정 |
-| `ui` | 스타일·레이아웃만 변경 (동작 변화 없음) |
-| `refactor` | 동작은 같고 코드 구조만 변경 |
-| `mock` | MSW 핸들러, 가짜 데이터 |
-| `chore` | 패키지, 설정 파일 |
-| `docs` | 문서 |
-
-- **범위**: `customer` `owner` `rider` `auth` `common` `api` `mock` `config`
-- **제목**: 한글, 명사형으로 끝냄("추가", "수정", "변경", "삭제"), 50자 이내, 마침표 없음
-- DB 규칙 때문에 일부러 그렇게 만든 코드면 본문에 근거를 남김
-- 한 커밋 = 한 가지 변경. `npm run lint`, `npm run build` 통과 후 커밋
-
-```
-feat(owner): 주문 관리 탭·카드 화면 추가
-fix(customer): 결제금액에 배달비 누락 수정
-ui(common): StatusBadge 색상 토큰 적용
-
-feat(customer): 주문 취소 버튼 제거
-
-고객 직접 취소 기능은 범위에서 제외됨 (DB 최종 규칙 ③)
-```
-
-### 코드 이름
-
-| 대상 | 규칙 | 예 |
-|---|---|---|
-| 라우트 폴더 | kebab-case | `app/owner/orders/` |
-| 컴포넌트 파일 | PascalCase | `OwnerOrderCard.tsx` |
-| 훅 | `use` + camelCase | `useOwnerOrders.ts` |
-| 그 외 ts | camelCase | `ownerApi.ts`, `status.ts` |
-| 상수 | UPPER_SNAKE | `ORDER_STATUS`, `POLLING` |
-| 타입 | PascalCase, `I` 접두사 없음 | `OwnerOrder` |
-
-### 코드 규칙
-
-- **상태 문자열은 `_lib/constants/status.ts`에서만** 가져다 씀 ("접수대기" 직접 타이핑 금지)
-- 금액 계산은 `_lib/utils/format.ts`의 `formatWon`, `getPaymentAmount` 사용
-- 쿼리 키는 `_lib/constants/queryKeys.ts`에서만 생성
-- 상태 변경(mutation) 후에는 폴링을 기다리지 않고 `invalidateQueries`로 즉시 재조회
-- 동적 라우트(`[id]`)는 **Cache Components 규칙**에 따라 `page.tsx`에서 `params` Promise를 `<Suspense>` 안 클라이언트 컴포넌트로 넘기고 `use(params)`로 꺼냄 (`restaurants/[id]/page.tsx` 참고)
-- `msw/browser`처럼 브라우저 전용 모듈은 `next/dynamic`의 `ssr: false`로 불러오고, **반드시 `<Suspense>`로 감쌈** (서버 번들에 들어가면 빌드 실패, 안 감싸면 instant 검증 에러)
-- `usePathname()`, `useSearchParams()`, `useParams()`를 쓰는 클라이언트 컴포넌트가 레이아웃에 있으면 `<Suspense>`로 감쌈 (동적 라우트에서 요청 시점 값이라 정적 셸을 막음)
-- 페이지 안에서 `redirect()`로 다른 주소로 보내지 않음 → `next.config.ts`의 `redirects()` 사용
-- 개발 서버 터미널에 `Could not validate instant` / `outside of <Suspense>`가 뜨면 위 규칙 위반이므로 바로 고칠 것
-
-### 폴링 주기 (`_lib/constants/polling.ts`)
-
-| 화면 | 주기 |
-|---|---|
-| 점주 주문 관리 | 10초 |
-| 라이더 수락 가능한 주문 | 5초 |
-| 고객 주문 상세 | 10초, 끝난 주문(배달완료·거절·결제실패)이면 중지 |
-| 라이더 진행 중 배달, 고객 주문 목록, 정산 | 폴링 안 함 |
-
-탭이 백그라운드면 자동으로 멈춥니다.
+- 한 화면에서만 쓰는 것 → 그 라우트 폴더 안 `_components`
 
 ---
 
 ## 디자인 규칙
 
-### AI가 만든 티 안 나게 — 금지 목록
-
-| 금지 | 대신 |
-|---|---|
-| 그라데이션, 그라데이션 글자 | 단색 |
-| 이모지 아이콘 | `lucide-react`, `strokeWidth={1.75}` |
-| 모든 카드에 그림자 | 카드는 **테두리만**. 그림자는 떠 있는 요소에만 |
-| `rounded-2xl` 이상 | 버튼·입력 `rounded-md`, 카드 `rounded-lg`. 완전 둥근 건 배지·토글만 |
-| `text-4xl font-extrabold` | 페이지 제목 `text-xl font-bold` 이하 |
-| Tailwind 기본색 (`orange-500`, `blue-500` ...) | 아래 **색 토큰만** |
-| 과장된 문구, 이모지 문구 | 담백한 실제 문구: "주문하기", "조리 완료" |
-| Lorem ipsum, 테스트1 | 그럴듯한 실제 데이터 |
-| hover 확대·튀는 애니메이션 | 색 변화만 |
+**콘셉트: 주문 티켓.** 같은 주문이 손님(주문서) → 사장님(주방 주문표) → 라이더(배달 전표) 화면에 **같은 모양의 티켓**으로 나타납니다. 큰 주문번호(`#0042`), 절취선(점선 + 양옆 반원 홈), 메뉴·금액. 카드 모양은 주문 티켓에만 쓰고, 나머지 목록은 구분선으로 나눕니다.
 
 ### 색 토큰 (`app/globals.css`)
 
+강조색은 **초록 하나**. 세 역할이 같은 앱처럼 보이도록 역할마다 색을 바꾸지 않고, 점주·라이더 화면 제목 앞에 `RoleBadge`("사장님", "라이더")를 붙입니다.
+
 | 클래스 | 값 | 용도 |
 |---|---|---|
-| `brand` | `#E2462B` | 주요 버튼, 강조 숫자 — **한 화면에 한두 군데** |
-| `brand-hover` | `#C93A21` | 버튼 눌림 |
-| `brand-subtle` | `#FDF0EC` | 선택 항목 배경 |
-| `ink` / `ink-2` / `ink-3` | `#1C1A17` / `#57524B` / `#8C867D` | 본문 / 보조 / 비활성 글자 |
-| `line` | `#E6E2DC` | 테두리, 구분선 |
-| `canvas` | `#F6F4F1` | 페이지 배경 (점주) |
-| `fill` | `#EFECE8` | 비활성 버튼, 안내 박스 |
+| `brand` / `brand-press` | `#1F7A55` / `#19654A` | 주요 버튼, 선택된 탭, 진행 상태 |
+| `brand-soft` / `brand-ink` | `#E6F2EC` / `#145A3E` | 배지·안내 배경 / 그 위 글자 |
+| `ink` / `muted` / `faint` | `#1C2430` / `#7A838C` / `#A7AFB8` | 본문 / 보조 / 비활성·placeholder |
+| `paper` / `tray` / `field` | `#FFFFFF` / `#F3F5F4` / `#F5F6F7` | 카드·헤더 / 페이지 배경 / 입력칸·보조 버튼 |
+| `line` | `#E3E7E5` | 테두리, 구분선 |
+| `danger` / `danger-soft` | `#C8372D` / `#FCEDEC` | 오류, 거절·실패 |
 
-상태 톤은 `<StatusBadge status="접수대기" />`로만 표시합니다.
+상태는 `<StatusBadge status="접수대기" />`로만 표시합니다. 톤은 세 가지: **active**(초록, 진행·완료) / **waiting**(회색, 누군가를 기다림) / **danger**(빨강, 거절·실패). 색과 글자를 항상 같이 씁니다.
 
-| 톤 | 해당 상태 |
-|---|---|
-| waiting | 접수대기, 배정완료, 생성완료 |
-| progress | 조리중, 픽업완료, 배달중 |
-| success | 조리완료, 배달완료, 완료, 지급완료, 영업중, 운행가능 |
-| danger | 거절, 결제실패, 실패, 취소완료 |
-| neutral | 영업종료, 운행종료 |
+### 글꼴·아이콘·문구
 
-### 글꼴·문구
-
-- Pretendard 하나. 굵기는 400 / 600(`font-semibold`) / 700(`font-bold`)만
-- 금액·수량·주문번호는 `tabular-nums`. 금액 표기는 `27,000원` (₩ 안 씀)
-- 버튼은 동사로 끝냄: "주문하기", "수락하고 조리 시작"
-- 에러는 무엇이 문제고 무엇을 하면 되는지: "이미 조리중 상태인 주문이에요. 목록을 새로고침했어요."
-- 존댓말은 **"~해요"체**로 통일
+- Wanted Sans 하나. 주문번호·금액은 크고 굵게, `tabular-nums`. 금액은 `27,000원`.
+- 아이콘은 `react-icons/lu`만 (예: `LuHouse`, `LuReceiptText`, `LuClipboardList`, `LuBike`). 이모지 아이콘 금지.
+- 존댓말은 "~해요"체. 버튼은 동사로: "로그인", "가입하기", "픽업 완료".
+- 오류는 무엇이 문제고 무엇을 하면 되는지: "이메일 또는 비밀번호가 맞지 않아요. 다시 확인해 주세요."
+- 제목 위 영문 대문자 라벨, 그라데이션, 모든 카드에 그림자 금지.
 
 ### 모바일 규칙
 
 | 항목 | 규칙 |
 |---|---|
-| 화면 폭 | `MobileShell`로 최대 480px 고정 (데스크톱에서도 가운데) |
-| 화면 높이 | `min-h-dvh` (`h-screen` 금지 — 주소창 때문에 하단이 가려짐) |
+| 화면 폭 | `MobileShell`로 최대 480px, 가운데 |
+| 높이 | `min-h-dvh` (`h-screen` 금지) |
+| 헤더 | 탭 화면: (역할 라벨) + 왼쪽 제목 / 하위 화면: 뒤로가기 + 가운데 제목 |
+| 하단 탭 | 탭 화면에서만 보임. 하단 고정 버튼이 있는 하위 화면에서는 자동으로 숨김 |
+| 주 버튼 | 화면당 하나, 하단 고정, 높이 54px |
+| 터치 영역 | 최소 44px |
+| 글자 | 본문 15px, 보조 13px, 12px 미만 금지. 입력칸 16px 이상 (iOS 확대 방지) |
 | 안전 영역 | 하단 고정 요소에 `pb-[env(safe-area-inset-bottom)]` |
-| 터치 영역 | 최소 44px, 주요 버튼 48px (`<Button size="lg">`) |
-| 본문 글자 | 15px (`text-body`), 보조 13px (`text-caption`), 12px 미만 금지 |
-| 입력창 | 16px 이상 (iOS 자동 확대 방지, `globals.css`에 적용됨) |
-| 간격 | 4의 배수, 좌우 여백 16px (`px-4`) |
-| hover | 쓰지 않음. 눌림 피드백은 `active:` |
-| 선택 UI | 바텀시트. 되돌릴 수 없는 작업(거절 등)만 `ConfirmDialog` |
-| 토스트 | 하단 탭 바 바로 위 (`toast("...")`) |
-| 하단 CTA가 있는 화면 | 하단 탭 바 숨김 (`BottomTabBar`의 `hideOn`) |
 | 숫자 입력 | `type="number"` 대신 `inputMode="numeric"` |
 
 ---
 
-## 가짜 API (MSW) — 프론트가 가정한 명세
+## API
 
-> 백엔드와 합의 전 **임시 명세**입니다. 응답 필드명은 DB 컬럼명(snake_case)을 그대로 씁니다.
+전체 명세는 **API 요청서**(36개)를 따릅니다. 지금 MSW로 만든 것은 인증 6개입니다.
 
-| 메서드 | 경로 | 설명 |
-|---|---|---|
-| GET | `/restaurants` | 음식점 목록 |
-| GET | `/restaurants/:id` | 음식점 상세 |
-| GET | `/restaurants/:id/menus` | 메뉴 목록 |
-| GET | `/owner/restaurant` | 로그인한 점주의 가게 |
-| PATCH | `/owner/restaurant/status` | 영업상태 변경 `{ status: "영업중" \| "영업종료" }` |
-| GET | `/owner/orders` | 점주 주문 목록 (주문상세 + 배달 요약 포함) |
-| PATCH | `/owner/orders/:id/status` | 접수대기→조리중, 조리중→조리완료 `{ status }` |
-| POST | `/owner/orders/:id/reject` | 거절 (주문상태 거절 + 결제상태 취소완료) |
+| 번호 | 메서드 | 경로 | 비고 |
+|---|---|---|---|
+| C1·O1·R1 | POST | `/api/{customers\|owners\|riders}/signup` | 이메일 중복 409. 점주는 phone 없음 |
+| C2·O2·R2 | POST | `/api/{customers\|owners\|riders}/login` | 토큰은 쿠키로. 점주는 `restaurant_id`(없으면 null) |
+| A1 | POST | `/api/auth/logout` | 쿠키 삭제 |
+| A2 | GET | `/api/auth/me` | `{ role, id, name }` |
 
-에러 응답(가정): `{ "code": "INVALID_ORDER_STATUS", "message": "..." }` + HTTP 상태코드
+에러 응답은 `{ "message": "..." }` + 상태코드이고, 화면은 `message`를 그대로 보여 줍니다.
 
-### 백엔드와 합의할 것
+### 폴링 (`_lib/constants/polling.ts`)
 
-- [ ] API 필드명 표기 (snake_case 유지 vs camelCase)
-- [ ] 에러 응답 형식, 상태코드 (이메일 중복·선착순 실패 409 등)
-- [ ] 인증 방식 (JWT 쿠키/헤더, 로그인 API 1개 vs 역할별 3개) → 이후 `proxy.ts`로 역할별 접근 제어
-- [ ] 주문 생성 API: 프론트는 메뉴ID·수량·배송지ID·결제수단만 보내고 금액은 서버가 계산
-- [ ] 주문 상세 응답에 배달 정보 포함 여부
-- [ ] 메뉴 설명·사진, 메뉴 판매중지(`is_active`) 컬럼 추가 여부 / 주문된 메뉴·배송지 삭제 처리
-- [ ] 결제 실패 재현 방법, 정산 지급완료 처리 주체, 정산 수동 생성 API
+| 화면 | 주기 |
+|---|---|
+| 사장님 새 주문 감시 | 10초 (+ 알림음·팝업) |
+| 라이더 수락 가능한 주문 | 10초 |
+| 손님 주문 상세 | 10초, 끝난 주문이면 멈춤 |
 
 ---
 
-## 작업 내역
+## 팀에 요청할 것
 
-### 2026-11-14 — 프로젝트 기반 + 고객 메뉴·점주 주문 관리 화면
+**DB 담당**
+- [ ] payment에 `payment_key`, `toss_order_id` 추가 (토스 결제·취소)
+- [ ] restaurant에 `image_url`(필수), menu에 `image_url`(선택) 추가
+- [ ] menu에 `is_sold_out`(기본 false) 추가
 
-**기반**
-- 패키지 추가: TanStack Query, axios, Zustand, MSW 3, lucide-react, Pretendard, date-fns, react-hook-form, zod
-- 디자인 토큰(`globals.css @theme`), Pretendard 로컬 폰트, 모바일 viewport(`viewportFit: cover`)
-- QueryClient Provider, MSW Provider(`NEXT_PUBLIC_API_MOCKING`으로 on/off)
-- `.env.example` 추가, `.gitignore`에서 `.env.example`만 예외 처리
-- ESLint에서 MSW 생성 파일(`public/mockServiceWorker.js`) 제외
-- 기본 템플릿 `app/page.tsx` 삭제 (고객 홈은 `(customer)/page.tsx`)
+**API 담당**
+- [ ] 로그인 시 JWT를 httpOnly 쿠키로, CORS `origin: http://localhost:3000, credentials: true`
+- [ ] 로그아웃·내 정보 API (A1·A2)
+- [ ] 토스 승인 후 주문 저장(C9), 거절 시 토스 결제 취소
+- [ ] 품절 메뉴 주문 거부, 점주 주문 목록에 손님 이름·전화번호 포함
+- [ ] [픽업 완료] 요청 하나로 `픽업완료`·`배달중` 이력 2개를 한 트랜잭션에
+- [ ] 정산 자동 생성·지급 스케줄러 + 시연용 수동 실행
+- [ ] 이미지 업로드 API (서버 `uploads/` 폴더 저장, DB엔 주소만)
 
-**공통**
-- 상태값 상수·톤 매핑(`status.ts`), 폴링 주기(`polling.ts`), 쿼리 키(`queryKeys.ts`)
-- DB 테이블 기준 타입(`Restaurant`, `Menu`, `OwnerOrder`, `OrderItem`)
-- axios 클라이언트 + `ApiError` (에러 문구 통일)
-- 장바구니 스토어: 한 주문 = 한 음식점, 다른 가게 메뉴 담으면 `"conflict"` 반환, localStorage 저장
-- 뒤로가기: 링크로 바로 들어와 앱 안 이동 기록이 없으면 앱 밖으로 나가지 않고 홈으로 이동 (`NavigationTracker`)
-- 공통 컴포넌트: `MobileShell`, `AppHeader`, `BottomTabBar`, `StatusBadge`, `Button`, `ConfirmDialog`, `Toaster`, `EmptyState`, `LoadingList`, `QuantityStepper`, `PriceSummary`, `ToggleSwitch`
+---
 
-**고객**
-- 음식점 목록: 영업중 우선 정렬, 영업상태 배지, 배달비(0원이면 "무료")
-- 메뉴 화면: 메뉴명·가격만 표시(DB에 설명·사진 없음), 담기/수량 조절, 영업종료면 담기 불가
-- 다른 가게 메뉴를 담으면 "장바구니를 비울까요?" 확인
-- 하단 고정 바: 주문금액·배달비 분리 표시, 버튼에 결제금액(주문금액 + 배달비)
-- 장바구니에 다른 가게 메뉴가 있으면 하단 바에 금액 대신 "○○ 메뉴가 담겨 있어요" 안내 (다른 가게 금액이 이 가게 금액처럼 보이는 문제 방지)
-- 장바구니: 수량 조절, 금액 3줄 요약. 주문하기는 API 합의 전이라 비활성
+## 컨벤션
 
-**점주**
-- 공통 상단 바: 가게명 + 영업상태 토글 (변경 시 고객 음식점 목록도 갱신)
-- 하단 탭(주문·메뉴·정산·가게), 주문 탭에 접수대기 건수 배지
-- 주문 관리: 상태 탭(접수대기·조리중·조리완료 + 건수) + 카드 리스트, 10초 폴링
-- 상태별로 가능한 버튼만 노출, 누르는 동안 비활성화(중복 클릭 방지)
-- 거절: 취소될 결제금액을 보여 주는 확인 다이얼로그
-- 조리완료 카드: 라이더 배정 전 "기다리는 중", 배정 후 라이더명·배달상태
-- 새 주문이 들어오면 진동 + 토스트, 거절된 주문은 하단 링크로 따로 보기
+**브랜치**: `main` + 작업 브랜치 `타입/범위-내용` (예: `feat/owner-order-board`)
 
-**검증**: `tsc --noEmit`, `npm run lint`, `npm run build` 통과 + 모바일 화면(390px) 헤드리스 브라우저로 주요 흐름 확인
-(음식점 목록 → 메뉴 담기 → 다른 가게 담기 확인창 → 영업종료 가게 → 장바구니 금액 / 점주 수락 → 거절 다이얼로그 → 탭 이동 → 영업상태 토글)
+**커밋**: `<타입>(<범위>): <제목>` — 제목은 한글 명사형, 50자 이내
 
-#### 커밋 제안 (위 작업을 컨벤션대로 나눈 순서)
-
-```
-chore(config): TanStack Query, Zustand, MSW 등 패키지 설치
-chore(config): 환경변수 예시 파일 추가 및 ESLint 제외 경로 설정
-ui(common): 디자인 토큰과 Pretendard 폰트, 모바일 viewport 적용
-feat(common): 상태값·폴링·쿼리키 상수와 DB 기준 타입 추가
-feat(api): axios 클라이언트와 음식점·점주 API 함수 추가
-mock(common): MSW 워커와 음식점·점주 주문 가짜 데이터 추가
-feat(common): 모바일 공통 컴포넌트 추가
-feat(customer): 음식점 목록·메뉴·장바구니 화면 추가
-feat(owner): 주문 관리 탭·카드 화면과 영업상태 토글 추가
-docs: README에 실행 방법·컨벤션·작업 내역 정리
-```
-
-### 2026-11-14 — Cache Components `instant` 검증 에러 수정
-
-개발 서버에서 `Route "/": Could not validate instant ...` 에러가 나던 문제 수정.
-
-| 원인 | 수정 |
+| 타입 | 언제 |
 |---|---|
-| `ssr: false`로 불러온 `MswStarter`가 서버에서 "브라우저 전용" 신호를 던지는데, 루트 레이아웃에 `<Suspense>`가 없어 검증이 멈춤 | `MswStarter`를 `<Suspense fallback={null}>`로 감쌈 |
-| MSW 준비 전까지 `children`을 아예 안 그려서 서버 렌더링 결과가 빈 화면 | `children`은 항상 그리고, API 요청만 워커 준비까지 대기 (`client.ts`의 `mockReady` + 요청 인터셉터) |
-| 고쳐지자 드러난 추가 경고: `/restaurants/[id]`에서 `usePathname()`이 `<Suspense>` 밖 (`NavigationTracker`, 하단 탭 바) | 각각 `<Suspense fallback={null}>`로 감쌈 |
-| `/owner` 페이지의 `redirect()`가 렌더링 중 에러로 잡힘 | `app/owner/page.tsx` 삭제, `next.config.ts`의 `redirects()`로 이동 |
+| `feat` | 새 기능·화면 |
+| `fix` | 버그 수정 |
+| `ui` | 스타일만 |
+| `refactor` | 구조만 |
+| `mock` | MSW |
+| `chore` | 패키지·설정 |
+| `docs` | 문서 |
 
-**검증**: `.next` 캐시 삭제 후 `tsc`, `lint`, `build` 통과. 개발 서버에서 전체 화면 12개 접속 시 에러·경고 0건
+범위: `customer` `owner` `rider` `auth` `common` `api` `mock` `config`
 
-```
-fix(common): Cache Components instant 검증 에러 수정
-
-- MswStarter(ssr:false)와 usePathname 사용 컴포넌트를 Suspense로 감쌈
-- MSW 준비 전 화면을 막지 않고 API 요청만 대기하도록 변경
-- /owner 리다이렉트를 페이지 redirect()에서 next.config redirects로 이동
-```
-
-### 다음 작업
-
-- 고객: 배송지 관리, 주문하기(배송지·결제수단 선택), 주문 상세(진행 바), 주문 내역
-- 점주: 메뉴 관리(바텀시트 등록·수정), 가게 설정(배달비), 정산 내역
-- 라이더: 운행상태, 수락 가능한 주문(5초 폴링), 배달 진행(다음 단계 버튼)
-- 로그인·회원가입, `proxy.ts` 역할별 접근 제어 (인증 방식 합의 후)
+**코드**
+- 상태 문자열은 `_lib/constants/status.ts`에서만 가져다 씀 ("접수대기" 직접 타이핑 금지)
+- 역할별 경로·문구는 `_lib/constants/roles.ts`의 `ROLE_CONFIG`
+- 서버 컴포넌트에서 클라이언트 컴포넌트로 함수(아이콘 컴포넌트 등)를 넘기지 않음 → 이름이나 키만 넘김
+- 커밋 전 `npm run lint`, `npm run build` 통과

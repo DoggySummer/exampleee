@@ -1,23 +1,7 @@
-import { cn } from "@/app/_lib/utils/cn";
-
-/**
- * 모든 화면의 바깥 틀. 데스크톱 브라우저로 열어도 480px 폭으로 고정한다.
- * tone="white": 고객 화면 / tone="canvas": 카드가 쌓이는 점주 화면
- */
-export function MobileShell({
-  children,
-  tone = "white",
-}: {
-  children: React.ReactNode;
-  tone?: "white" | "canvas";
-}) {
+/** 모든 화면을 최대 480px 폭으로 가운데에 둔다 (PC로 영상을 찍어도 앱처럼 보이게) */
+export function MobileShell({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className={cn(
-        "relative mx-auto flex min-h-dvh w-full max-w-[480px] flex-col border-x border-line",
-        tone === "white" ? "bg-white" : "bg-canvas",
-      )}
-    >
+    <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-paper shadow-[0_0_0_1px_var(--color-line)]">
       {children}
     </div>
   );

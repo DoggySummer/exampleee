@@ -1,61 +1,45 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/app/_lib/utils/cn";
+import type { IconType } from "react-icons";
+import type { Role } from "@/app/_lib/constants/roles";
+import { TABS } from "./tabs";
 
-export interface TabItem {
+export interface Tab {
   href: string;
   label: string;
-  icon: LucideIcon;
-  /** 숫자 배지 (0이면 숨김) */
-  badge?: number;
-  /** 홈("/")처럼 정확히 일치할 때만 활성화 */
-  exact?: boolean;
+  icon: IconType;
 }
 
-interface BottomTabBarProps {
-  items: TabItem[];
-  /** 이 경로로 시작하는 화면에서는 탭 바를 숨김 (하단 고정 CTA가 있는 화면) */
-  hideOn?: string[];
-}
-
-/** 하단 탭 바 높이 — 본문 하단 여백 계산에 사용 */
-export const TAB_BAR_HEIGHT = 56;
-
-export function BottomTabBar({ items, hideOn = [] }: BottomTabBarProps) {
+/**
+ * 역할별 하단 탭. 탭 화면(href와 주소가 정확히 같을 때)에서만 보이고,
+ * 하위 화면(상세, 장바구니 등 하단 버튼이 있는 화면)에서는 숨긴다.
+ * 아이콘(함수)은 서버 레이아웃에서 넘길 수 없어서 역할 이름만 받는다.
+ */
+export function BottomTabBar({ role }: { role: Role }) {
   const pathname = usePathname();
-  if (hideOn.some((prefix) => pathname.startsWith(prefix))) return null;
+  const tabs = TABS[role];
+  if (!tabs.some((t) => t.href === pathname)) return null;
 
   return (
-    <>
-      {/* 탭 바에 본문 마지막 항목이 가려지지 않도록 같은 높이의 여백 */}
-      <div aria-hidden className="h-[calc(56px+env(safe-area-inset-bottom))] shrink-0" />
-      <nav className="fixed bottom-0 left-1/2 z-20 grid w-full max-w-[480px] -translate-x-1/2 auto-cols-fr grid-flow-col border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
-        {items.map(({ href, label, icon: Icon, badge, exact }) => {
-          const active = exact ? pathname === href : pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "relative flex h-14 flex-col items-center justify-center gap-0.5",
-                active ? "text-ink" : "text-ink-3",
-              )}
-            >
-              <Icon size={22} strokeWidth={1.75} />
-              <span className={cn("text-tab", active && "font-semibold")}>{label}</span>
-              {!!badge && (
-                <span className="absolute top-1.5 left-1/2 ml-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-brand px-1 text-tab font-semibold text-white tabular-nums">
-                  {badge}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-      </nav>
-    </>
+    <nav className="sticky bottom-0 z-10 flex border-t border-line bg-paper pb-[env(safe-area-inset-bottom)]">
+      {tabs.map(({ href, label, icon: Icon }) => {
+        const on = href === pathname;
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-current={on ? "page" : undefined}
+            className={`flex h-16 flex-1 flex-col items-center justify-center gap-1 text-tab font-semibold ${
+              on ? "text-brand" : "text-faint"
+            }`}
+          >
+            <Icon size={22} aria-hidden />
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
