@@ -56,9 +56,9 @@ export const customerHandlers = [
   }),
 
   // C3 배송지 목록
-  http.get(`${base}/customers/me/addresses`, async () => {
+  http.get(`${base}/customers/me/addresses`, async ({ request }) => {
     await delay(200);
-    const user = requireRole("customer");
+    const user = requireRole(request, "customer");
     if (user instanceof Response) return user;
     return HttpResponse.json(db.addresses.filter((a) => a.customer_id === user.id));
   }),
@@ -66,7 +66,7 @@ export const customerHandlers = [
   // C4 배송지 등록
   http.post(`${base}/customers/me/addresses`, async ({ request }) => {
     await delay(300);
-    const user = requireRole("customer");
+    const user = requireRole(request, "customer");
     if (user instanceof Response) return user;
     const body = (await request.json()) as AddressBody;
     if (!body.address?.trim()) return err(400, "주소를 입력해 주세요");
@@ -83,7 +83,7 @@ export const customerHandlers = [
   // C5 배송지 수정
   http.patch(`${base}/customers/me/addresses/:id`, async ({ params, request }) => {
     await delay(300);
-    const user = requireRole("customer");
+    const user = requireRole(request, "customer");
     if (user instanceof Response) return user;
     const row = db.addresses.find((a) => a.address_id === Number(params.id));
     if (!row) return err(404, "배송지를 찾지 못했어요");
@@ -95,9 +95,9 @@ export const customerHandlers = [
   }),
 
   // C6 배송지 삭제 — 주문에 쓴 배송지는 409
-  http.delete(`${base}/customers/me/addresses/:id`, async ({ params }) => {
+  http.delete(`${base}/customers/me/addresses/:id`, async ({ params, request }) => {
     await delay(300);
-    const user = requireRole("customer");
+    const user = requireRole(request, "customer");
     if (user instanceof Response) return user;
     const id = Number(params.id);
     const row = db.addresses.find((a) => a.address_id === id);
@@ -111,7 +111,7 @@ export const customerHandlers = [
   // C9 주문하기: 토스 승인 → 주문·주문상세·결제를 한 번에 저장
   http.post(`${base}/orders`, async ({ request }) => {
     await delay(900);
-    const user = requireRole("customer");
+    const user = requireRole(request, "customer");
     if (user instanceof Response) return user;
     const body = (await request.json()) as CreateOrderBody;
 
@@ -202,9 +202,9 @@ export const customerHandlers = [
   }),
 
   // C10 내 주문 목록 (최신순, 결제실패 주문은 빼고)
-  http.get(`${base}/customers/me/orders`, async () => {
+  http.get(`${base}/customers/me/orders`, async ({ request }) => {
     await delay(250);
-    const user = requireRole("customer");
+    const user = requireRole(request, "customer");
     if (user instanceof Response) return user;
     const rows: CustomerOrderSummary[] = db.orders
       .filter((o) => o.customer_id === user.id && o.status !== "결제실패")
@@ -226,9 +226,9 @@ export const customerHandlers = [
   }),
 
   // C11 주문 상세
-  http.get(`${base}/orders/:id`, async ({ params }) => {
+  http.get(`${base}/orders/:id`, async ({ params, request }) => {
     await delay(250);
-    const user = requireRole("customer");
+    const user = requireRole(request, "customer");
     if (user instanceof Response) return user;
     const order = db.orders.find((o) => o.order_id === Number(params.id));
     if (!order) return err(404, "주문을 찾지 못했어요");

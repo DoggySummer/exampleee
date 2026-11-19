@@ -73,9 +73,9 @@ function maybeDemoCooked() {
 
 export const riderHandlers = [
   // R8(추가 요청) 내 라이더 정보·운행상태
-  http.get(`${base}/riders/me`, async () => {
+  http.get(`${base}/riders/me`, async ({ request }) => {
     await delay(200);
-    const user = requireRole("rider");
+    const user = requireRole(request, "rider");
     if (user instanceof Response) return user;
     const body: RiderMe = { rider_id: user.id, name: user.name, status: statusOf(user.id) };
     return HttpResponse.json(body);
@@ -84,7 +84,7 @@ export const riderHandlers = [
   // R3 출근·퇴근 (배달 중이면 409)
   http.patch(`${base}/riders/me/status`, async ({ request }) => {
     await delay(300);
-    const user = requireRole("rider");
+    const user = requireRole(request, "rider");
     if (user instanceof Response) return user;
     const { status } = (await request.json()) as { status: "운행가능" | "운행종료" };
     if (statusOf(user.id) === "배달중") return err(409, "배달을 마친 뒤 퇴근할 수 있어요");
@@ -93,9 +93,9 @@ export const riderHandlers = [
   }),
 
   // R4 수락 가능한 주문 (조리완료 + 배달 없음, 오래 기다린 주문 먼저)
-  http.get(`${base}/deliveries/available`, async () => {
+  http.get(`${base}/deliveries/available`, async ({ request }) => {
     await delay(250);
-    const user = requireRole("rider");
+    const user = requireRole(request, "rider");
     if (user instanceof Response) return user;
     if (statusOf(user.id) === "운행가능") maybeDemoCooked();
     const rows: AvailableOrder[] = available()
@@ -118,7 +118,7 @@ export const riderHandlers = [
   // R5 배달 수락 (선착순). 배달 생성 + 배정완료 이력 + 라이더 배달중 (한 트랜잭션)
   http.post(`${base}/deliveries`, async ({ request }) => {
     await delay(400);
-    const user = requireRole("rider");
+    const user = requireRole(request, "rider");
     if (user instanceof Response) return user;
     const { order_id } = (await request.json()) as { order_id: number };
     const st = statusOf(user.id);
@@ -139,7 +139,7 @@ export const riderHandlers = [
   // R6 내 배달 (?active=true 진행 중만)
   http.get(`${base}/riders/me/deliveries`, async ({ request }) => {
     await delay(250);
-    const user = requireRole("rider");
+    const user = requireRole(request, "rider");
     if (user instanceof Response) return user;
     const activeOnly = new URL(request.url).searchParams.get("active") === "true";
     const rows = db.deliveries
@@ -153,7 +153,7 @@ export const riderHandlers = [
   // [픽업 완료]는 status: "배달중"으로 보내고, 서버가 픽업완료·배달중 이력 두 개를 한 번에 남긴다
   http.patch(`${base}/deliveries/:id/status`, async ({ params, request }) => {
     await delay(400);
-    const user = requireRole("rider");
+    const user = requireRole(request, "rider");
     if (user instanceof Response) return user;
     const d = db.deliveries.find((x) => x.delivery_id === Number(params.id));
     if (!d) return err(404, "배달을 찾지 못했어요");
@@ -175,9 +175,9 @@ export const riderHandlers = [
   }),
 
   // S3 내 라이더 정산 목록
-  http.get(`${base}/riders/me/settlements`, async () => {
+  http.get(`${base}/riders/me/settlements`, async ({ request }) => {
     await delay(250);
-    const user = requireRole("rider");
+    const user = requireRole(request, "rider");
     if (user instanceof Response) return user;
     return HttpResponse.json(
       db.settlements.filter((s) => s.rider_id === user.id).sort((a, b) => b.start_date.localeCompare(a.start_date)),

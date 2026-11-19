@@ -15,6 +15,8 @@ export function LogoutButton({ role }: { role: Role }) {
     setPending(true);
     try {
       await logout();
+    } catch {
+      // 서버 로그아웃이 실패해도 토큰은 지웠으므로 로그인 화면으로 보낸다
     } finally {
       queryClient.clear();
       router.replace(ROLE_CONFIG[role].loginPath);

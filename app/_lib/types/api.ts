@@ -7,13 +7,32 @@ export interface ApiErrorBody {
   message: string;
 }
 
-/** 로그인·내 정보 응답. 토큰은 본문이 아니라 쿠키로 받는다 */
+/** 화면에서 쓰는 로그인 사용자 */
 export interface AuthUser {
   role: Role;
   id: number;
   name: string;
-  /** 점주만: 가게가 없으면 null → 가게 등록 화면으로 */
-  restaurant_id?: number | null;
+  /** 라이더만: 운행상태 */
+  riderStatus?: RiderStatus;
+}
+
+/** API 명세서의 사용자 객체 (API 01·02·04) */
+export interface ApiUser {
+  id: number;
+  role: string; // "CUSTOMER" | "OWNER" | "RIDER"
+  name: string;
+  email: string;
+  phone?: string;
+  /** 라이더만 */
+  status?: RiderStatus;
+}
+
+/** API 02 로그인 응답 */
+export interface LoginResponse {
+  token: string;
+  tokenType: "Bearer";
+  expiresAt: string;
+  user: ApiUser;
 }
 
 export interface LoginBody {

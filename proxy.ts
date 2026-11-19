@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readRole } from "@/app/_lib/auth/token";
-import { ROLE_CONFIG, TOKEN_COOKIE, type Role } from "@/app/_lib/constants/roles";
+import { ROLE_CONFIG, ROLE_COOKIE, TOKEN_COOKIE, type Role } from "@/app/_lib/constants/roles";
 
 /** 로그인·회원가입 화면은 누구나 들어갈 수 있다 */
 const AUTH_PAGES = new Set(
@@ -24,7 +24,7 @@ export function proxy(request: NextRequest) {
   if (AUTH_PAGES.has(pathname)) return NextResponse.next();
 
   const need = requiredRole(pathname);
-  const role = readRole(request.cookies.get(TOKEN_COOKIE)?.value);
+  const role = readRole(request.cookies.get(TOKEN_COOKIE)?.value, request.cookies.get(ROLE_COOKIE)?.value);
   if (role === need) return NextResponse.next();
 
   const url = new URL(ROLE_CONFIG[need].loginPath, request.url);

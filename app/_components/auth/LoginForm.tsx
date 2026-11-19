@@ -53,11 +53,8 @@ export function LoginForm({ role, next, joinedEmail }: Props) {
       const user = await login(role, values);
       // 로그인 전 화면에서 "로그인 안 함"으로 캐시된 내 정보를 바로 바꾼다
       queryClient.setQueryData(queryKeys.me, user);
-      // 가게가 없는 점주는 가게 등록부터
-      const dest =
-        role === "owner" && user.restaurant_id === null
-          ? "/owner/restaurant/new"
-          : (safeNext(role, next) ?? cfg.home);
+      // 가게가 없는 점주는 /owner에 들어가면 OwnerShell이 가게 등록으로 보낸다
+      const dest = safeNext(role, next) ?? cfg.home;
       router.replace(dest);
       router.refresh();
     } catch (e) {

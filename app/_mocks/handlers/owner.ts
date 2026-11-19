@@ -15,8 +15,8 @@ function myRestaurant(ownerId: number) {
   return db.restaurants.find((r) => r.restaurant_id === user?.restaurant_id);
 }
 
-function ownerContext(): { restaurant: Restaurant } | Response {
-  const user = requireRole("owner");
+function ownerContext(request: Request): { restaurant: Restaurant } | Response {
+  const user = requireRole(request, "owner");
   if (user instanceof Response) return user;
   const restaurant = myRestaurant(user.id);
   if (!restaurant) return err(404, "등록한 가게가 없어요");
@@ -78,8 +78,8 @@ function maybeDemoOrder(restaurant: Restaurant) {
 }
 
 /** 상태를 바꾸기 전 공통 검사 */
-function findMyOrder(id: number): { order: Order } | Response {
-  const ctx = ownerContext();
+function findMyOrder(request: Request, id: number): { order: Order } | Response {
+  const ctx = ownerContext(request);
   if (ctx instanceof Response) return ctx;
   const order = db.orders.find((o) => o.order_id === id);
   if (!order) return err(404, "주문을 찾지 못했어요");
@@ -93,7 +93,7 @@ export const ownerHandlers = [
   // 이미지 업로드 (가게·메뉴 사진). 실제 서버는 uploads/ 폴더에 저장하고 주소를 준다
   http.post(`${base}/uploads`, async ({ request }) => {
     await delay(500);
-    if (!readTokenUser()) return err(401, "로그인이 필요해요");
+    if (!readTokenUser(request)) return err(401, "로그인이 필요해요");
     const file = (await request.formData()).get("file");
     if (!(file instanceof File)) return err(400, "사진 파일을 골라 주세요");
     if (!["image/jpeg", "image/png"].includes(file.type)) return err(400, "jpg·png 사진만 올릴 수 있어요");
@@ -105,9 +105,9 @@ export const ownerHandlers = [
   }),
 
   // O3 내 가게 + 메뉴
-  http.get(`${base}/owners/me/restaurant`, async () => {
+  http.get(`${base}/owners/me/restaurant`, async ({ request }) => {
     await delay(250);
-    const ctx = ownerContext();
+    const ctx = ownerContext(request);
     if (ctx instanceof Response) return ctx;
     return HttpResponse.json({ ...ctx.restaurant, menus: db.menus.filter((m) => m.restaurant_id === ctx.restaurant.restaurant_id) });
   }),
@@ -115,7 +115,7 @@ export const ownerHandlers = [
   // O4 가게 등록 (점주 1명당 1개, 영업종료로 시작)
   http.post(`${base}/owners/me/restaurant`, async ({ request }) => {
     await delay(500);
-    const user = requireRole("owner");
+    const user = requireRole(request, "owner");
     if (user instanceof Response) return user;
     if (myRestaurant(user.id)) return err(409, "이미 등록한 가게가 있어요");
     const body = (await request.json()) as RestaurantBody;
@@ -137,7 +137,7 @@ export const ownerHandlers = [
   // O5 가게 수정 · 영업상태 변경
   http.patch(`${base}/owners/me/restaurant`, async ({ request }) => {
     await delay(300);
-    const ctx = ownerContext();
+    const ctx = ownerContext(request);
     if (ctx instanceof Response) return ctx;
     const body = (await request.json()) as Partial<RestaurantBody> & { status?: Restaurant["status"] };
     const r = ctx.restaurant;
@@ -152,7 +152,7 @@ export const ownerHandlers = [
   // O6 메뉴 등록
   http.post(`${base}/owners/me/restaurant/menus`, async ({ request }) => {
     await delay(300);
-    const ctx = ownerContext();
+    const ctx = ownerContext(request);
     if (ctx instanceof Response) return ctx;
     const body = (await request.json()) as MenuBody;
     const menu = {
@@ -170,7 +170,7 @@ export const ownerHandlers = [
   // O7 메뉴 수정 · 품절 (삭제는 없음)
   http.patch(`${base}/menus/:id`, async ({ params, request }) => {
     await delay(250);
-    const ctx = ownerContext();
+    const ctx = ownerContext(request);
     if (ctx instanceof Response) return ctx;
     const menu = db.menus.find((m) => m.menu_id === Number(params.id));
     if (!menu) return err(404, "메뉴를 찾지 못했어요");
@@ -180,9 +180,9 @@ export const ownerHandlers = [
   }),
 
   // O8 들어온 주문 목록 (결제실패 제외, 최신순)
-  http.get(`${base}/owners/me/orders`, async () => {
+  http.get(`${base}/owners/me/orders`, async ({ request }) => {
     await delay(250);
-    const ctx = ownerContext();
+    const ctx = ownerContext(request);
     if (ctx instanceof Response) return ctx;
     maybeDemoOrder(ctx.restaurant);
     const rows = db.orders
@@ -193,9 +193,9 @@ export const ownerHandlers = [
   }),
 
   // O9 수락: 접수대기 → 조리중
-  http.patch(`${base}/orders/:id/accept`, async ({ params }) => {
+  http.patch(`${base}/orders/:id/accept`, async ({ params, request }) => {
     await delay(300);
-    const r = findMyOrder(Number(params.id));
+    const r = findMyOrder(request, Number(params.id));
     if (r instanceof Response) return r;
     if (r.order.status !== "접수대기") return conflict(r.order);
     r.order.status = "조리중";
@@ -203,9 +203,9 @@ export const ownerHandlers = [
   }),
 
   // O10 거절: 접수대기 → 거절 + 토스 결제 취소 + 결제 취소완료 (한 트랜잭션)
-  http.patch(`${base}/orders/:id/reject`, async ({ params }) => {
+  http.patch(`${base}/orders/:id/reject`, async ({ params, request }) => {
     await delay(500);
-    const r = findMyOrder(Number(params.id));
+    const r = findMyOrder(request, Number(params.id));
     if (r instanceof Response) return r;
     if (r.order.status !== "접수대기") return conflict(r.order);
     r.order.status = "거절";
@@ -216,9 +216,9 @@ export const ownerHandlers = [
   }),
 
   // O11 조리완료: 조리중 → 조리완료 (라이더 수락 목록에 뜸)
-  http.patch(`${base}/orders/:id/cooked`, async ({ params }) => {
+  http.patch(`${base}/orders/:id/cooked`, async ({ params, request }) => {
     await delay(300);
-    const r = findMyOrder(Number(params.id));
+    const r = findMyOrder(request, Number(params.id));
     if (r instanceof Response) return r;
     if (r.order.status !== "조리중") return conflict(r.order);
     r.order.status = "조리완료";
@@ -227,9 +227,9 @@ export const ownerHandlers = [
   }),
 
   // S2 내 가게 정산 목록
-  http.get(`${base}/owners/me/settlements`, async () => {
+  http.get(`${base}/owners/me/settlements`, async ({ request }) => {
     await delay(250);
-    const ctx = ownerContext();
+    const ctx = ownerContext(request);
     if (ctx instanceof Response) return ctx;
     const rows = db.settlements
       .filter((s) => s.restaurant_id === ctx.restaurant.restaurant_id)
@@ -238,9 +238,9 @@ export const ownerHandlers = [
   }),
 
   // S4 정산 상세 (사장님·라이더 공통, 본인 정산만)
-  http.get(`${base}/settlements/:id`, async ({ params }) => {
+  http.get(`${base}/settlements/:id`, async ({ params, request }) => {
     await delay(250);
-    const user = readTokenUser();
+    const user = readTokenUser(request);
     if (!user) return err(401, "로그인이 필요해요");
     const s = db.settlements.find((x) => x.settlement_id === Number(params.id));
     if (!s) return err(404, "정산을 찾지 못했어요");

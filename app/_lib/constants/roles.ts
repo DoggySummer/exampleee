@@ -44,5 +44,20 @@ export const ROLE_CONFIG = {
   },
 } as const satisfies Record<Role, unknown>;
 
-/** 로그인 토큰을 담는 쿠키 이름 (백엔드와 합의한 값) */
+/**
+ * 로그인 토큰을 담는 쿠키 이름.
+ * 토큰은 API 응답 본문으로 받아 Authorization: Bearer 헤더로 보낸다 (API 명세서 02).
+ * 쿠키에도 넣어 두는 이유는 proxy.ts(서버)가 페이지 접근을 막을 때 읽기 위해서다.
+ */
 export const TOKEN_COOKIE = "token";
+/** 로그인한 역할 (proxy.ts가 역할별 화면을 나눌 때 읽음) */
+export const ROLE_COOKIE = "role";
+
+/** API 명세서의 역할 값 */
+export const API_ROLE = { customer: "CUSTOMER", owner: "OWNER", rider: "RIDER" } as const satisfies Record<Role, string>;
+export type ApiRole = (typeof API_ROLE)[Role];
+
+export function fromApiRole(r: string): Role | null {
+  const found = (Object.entries(API_ROLE) as [Role, string][]).find(([, v]) => v === r);
+  return found ? found[0] : null;
+}

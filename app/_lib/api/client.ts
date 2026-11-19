@@ -1,12 +1,11 @@
 import axios, { AxiosError } from "axios";
+import { clearSession, getToken } from "@/app/_lib/auth/session";
 import type { ApiErrorBody } from "@/app/_lib/types/api";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 export const apiClient = axios.create({
   baseURL: `${API_URL}/api`,
-  // 로그인 토큰(JWT)을 httpOnly 쿠키로 주고받는다 → 모든 요청에 쿠키 포함
-  withCredentials: true,
   timeout: 10_000,
 });
 
@@ -28,6 +27,9 @@ export function markMockReady() {
 
 apiClient.interceptors.request.use(async (config) => {
   await mockReady;
+  // 로그인 토큰은 Authorization: Bearer 헤더로 보낸다 (API 명세서 공통)
+  const token = getToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
@@ -45,6 +47,8 @@ apiClient.interceptors.response.use(
   (res) => res,
   (error: AxiosError<ApiErrorBody>) => {
     const status = error.response?.status ?? 0;
+    // 토큰이 만료·폐기됐으면 쿠키를 지운다 → 다음 화면 이동 때 proxy.ts가 로그인 화면으로 보냄
+    if (status === 401 && getToken() && !error.config?.url?.startsWith("/auth/login")) clearSession();
     const message =
       error.response?.data?.message ?? "요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.";
     return Promise.reject(new ApiError(status, message));

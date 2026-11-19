@@ -28,7 +28,7 @@ npm run dev                    # http://localhost:3000
 | 라이더 | `rider@test.com` | `/rider` 라이더 홈 |
 
 - 회원가입에서 `taken@test.com`을 쓰면 이메일 중복 오류(409)를 볼 수 있어요.
-- 가짜 DB는 메모리에 있어서 **새로고침하면 새로 가입한 계정·새 주문은 사라져요.** 로그인 쿠키와 장바구니는 남습니다.
+- 가짜 DB는 메모리에 있어서 **새로고침하면 새로 가입한 계정·새 주문은 사라져요.** 로그인(토큰 쿠키)과 장바구니는 남습니다.
 
 ### 손님 데모 (MSW)
 
@@ -75,11 +75,11 @@ npm run dev                    # http://localhost:3000
 | 서버 상태 | TanStack Query 5 |
 | 클라이언트 상태 | Zustand 5 (장바구니 등) |
 | 폼 | react-hook-form + zod |
-| HTTP | axios (`withCredentials: true`) |
+| HTTP | axios (Bearer 토큰 인터셉터) |
 | 가짜 API | MSW 3 (옵션 이름 `onUnhandledFrame`) |
 | 아이콘 | react-icons — **Lucide 세트(`react-icons/lu`)만** |
 | 글꼴 | Wanted Sans Variable (`next/font/local`) |
-| 인증 | JWT를 httpOnly 쿠키로, 페이지 접근은 `proxy.ts` |
+| 인증 | Bearer 토큰 (`Authorization` 헤더), 페이지 접근은 `proxy.ts` |
 
 ---
 
@@ -151,16 +151,18 @@ npm run dev                    # http://localhost:3000
 
 ---
 
-## 인증 흐름
+## 인증 흐름 (API 명세서 01~04)
 
-1. 로그인 API(`/api/customers|owners|riders/login`)가 성공하면 서버가 `token` 쿠키(httpOnly, SameSite=Lax)를 심음. 응답 본문에는 `role`·`id`·`name`만.
-2. 이후 요청은 브라우저가 쿠키를 자동으로 보냄 (`withCredentials: true`).
-3. `proxy.ts`가 토큰의 `role`만 읽어서 페이지 접근을 막음. 서명 검증은 Express가 매 요청마다 함.
+1. `POST /api/auth/login { role: "CUSTOMER" | "OWNER" | "RIDER", email, password }` → 응답 본문으로 `{ token, tokenType: "Bearer", expiresAt, user }`.
+2. 프론트가 토큰과 역할을 쿠키(`token`, `role`)에 보관한다 — 만료 시각은 `expiresAt`과 같게. (`_lib/auth/session.ts`)
+3. 모든 API 요청에 `Authorization: Bearer <token>`을 붙인다 (`_lib/api/client.ts` 인터셉터). 401이 오면 쿠키를 지운다.
+4. `proxy.ts`는 `token`·`role` 쿠키만 보고 페이지 접근을 막는다. 토큰 내용은 해석하지 않고, 진짜 검증은 백엔드가 매 요청마다 한다.
    - 로그인 안 했거나 다른 역할이면 → 그 역할의 로그인 화면으로, `?next=원래주소`를 붙여서.
    - 로그인·회원가입 화면, `/`, `/restaurants/*`는 누구나 들어감.
-4. 로그아웃은 `POST /api/auth/logout` (httpOnly 쿠키는 프론트가 못 지움).
+5. 로그아웃: `POST /api/auth/logout` 후 쿠키 삭제 (서버 요청이 실패해도 삭제).
+6. 내 정보: `GET /api/me` — 라이더는 운행상태 `status` 포함.
 
-> MSW는 httpOnly 쿠키를 만들 수 없어서 가짜 API에서만 `document.cookie`로 넣습니다. 실제 서버에서는 `Set-Cookie`로 받습니다.
+> 쿠키를 프론트가 직접 쓰므로 httpOnly가 아니에요(과제 범위에서 허용). 백엔드는 쿠키를 다루지 않아도 되고, CORS에서 `http://localhost:3000`만 허용하면 됩니다.
 
 ---
 
@@ -268,17 +270,17 @@ app/
 | S2 | GET | `/api/owners/me/settlements` | 최신 주 먼저 |
 | S4 | GET | `/api/settlements/:id` | `items[]`에 `delivered_at` 포함. 본인 정산만 |
 | — | POST | `/api/uploads` | multipart `file` → `{ url }`. 5MB 이하 jpg·png |
-| R8 (추가) | GET | `/api/riders/me` | `{ rider_id, name, status }` — 홈의 출근 스위치·배달 중 표시용 |
+| R8 | GET | `/api/riders/me` | `{ rider_id, name, status }` — 명세서에서는 `GET /api/me`의 `status`로 대신하므로 백엔드 연결 때 정리 |
 | R3 | PATCH | `/api/riders/me/status` | `{ status: "운행가능" \| "운행종료" }`. 배달 중이면 409 |
 | R4 | GET | `/api/deliveries/available` | 조리완료 + 배달 없음, 오래된 주문 먼저 |
 | R5 | POST | `/api/deliveries` | `{ order_id }`. 퇴근·배달 중·이미 다른 라이더 수락이면 409 |
 | R6 | GET | `/api/riders/me/deliveries` | 가게·주소·메뉴·배달비·`history[]` 포함. 배달 상세도 이 목록에서 찾음 |
 | R7 | PATCH | `/api/deliveries/:id/status` | `[픽업 완료]` → `{ status: "배달중" }` (픽업완료·배달중 이력 2개), `[배달 완료]` → `{ status: "배달완료" }`. 순서가 안 맞으면 409 |
 | S3 | GET | `/api/riders/me/settlements` | |
-| C1·O1·R1 | POST | `/api/{customers\|owners\|riders}/signup` | 이메일 중복 409. 점주는 phone 없음 |
-| C2·O2·R2 | POST | `/api/{customers\|owners\|riders}/login` | 토큰은 쿠키로. 점주는 `restaurant_id`(없으면 null) |
-| A1 | POST | `/api/auth/logout` | 쿠키 삭제 |
-| A2 | GET | `/api/auth/me` | `{ role, id, name }` |
+| 01 | POST | `/api/auth/register` | `{ role, email, password, name, phone? }`. 같은 역할에 이메일 중복이면 409. 점주는 phone 없음 |
+| 02 | POST | `/api/auth/login` | `{ role, email, password }` → `{ token, tokenType, expiresAt, user }` |
+| 03 | POST | `/api/auth/logout` | Bearer. 204 |
+| 04 | GET | `/api/me` | Bearer. `{ id, role, name, email, phone?, status? }` |
 
 에러 응답은 `{ "message": "..." }` + 상태코드이고, 화면은 `message`를 그대로 보여 줍니다.
 
@@ -312,12 +314,10 @@ app/
 - [ ] menu에 `is_sold_out`(기본 false) 추가
 
 **API 담당**
-- [ ] 로그인 시 JWT를 httpOnly 쿠키로, CORS `origin: http://localhost:3000, credentials: true`
-- [ ] 로그아웃·내 정보 API (A1·A2)
+- [ ] 로그인은 명세서대로 토큰을 응답 본문으로 (`expiresAt` 포함), CORS `origin: http://localhost:3000`
 - [ ] 토스 승인 후 주문 저장(C9), 거절 시 토스 결제 취소
 - [ ] 품절 메뉴 주문 거부, 점주 주문 목록에 손님 이름·전화번호 포함
 - [ ] [픽업 완료] 요청 하나로 `픽업완료`·`배달중` 이력 2개를 한 트랜잭션에 (R7에 `status: "배달중"`으로 보냄)
-- [ ] **R8 `GET /api/riders/me` 추가** (요청서에 없던 것 — 라이더 홈에서 운행상태가 필요)
 - [ ] 정산 자동 생성·지급 스케줄러 + 시연용 수동 실행
 - [ ] 이미지 업로드 API `POST /api/uploads` (서버 `uploads/` 폴더 저장, DB엔 주소만)
 - [ ] O9~O11은 현재 상태가 맞지 않으면 409 + "이미 ○○ 상태인 주문이에요" (두 창에서 동시에 눌렀을 때)
