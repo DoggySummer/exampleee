@@ -12,6 +12,8 @@ import type {
   OrderItem,
   Payment,
   Restaurant,
+  Settlement,
+  SettlementItem,
 } from "@/app/_lib/types/db";
 
 export interface MockUser {
@@ -112,10 +114,88 @@ const deliveryHistory: DeliveryHistory[] = [
   { history_id: 7, delivery_id: 2, status: "배달완료", changed_at: ago(60 * 24 * 3 - 41) },
 ];
 
+
+/* ───── 사장님(가게 1) 데모용 주문: 손님 2(이수아)가 한 주문 ───── */
+const addr2 = "수원시 영통구 광교호수로 277 1102동 903호";
+addresses.push({ address_id: 3, customer_id: 2, address: "수원시 영통구 광교호수로 277", address_detail: "1102동 903호" });
+
+/** 주문 한 건과 주문상세·결제·배달·이력을 같이 넣는다 */
+function seedOrder(o: {
+  id: number; minutesAgo: number; status: Order["status"]; items: [number, number][];
+  delivery?: Delivery["status"]; deliveredMinutesAgo?: number;
+}) {
+  const lines = o.items.map(([menuId, q]) => ({ menu: menus.find((x) => x.menu_id === menuId)!, q }));
+  const total = lines.reduce((s, l) => s + l.menu.price * l.q, 0);
+  orders.push({ order_id: o.id, customer_id: 2, restaurant_id: 1, ordered_time: ago(o.minutesAgo), status: o.status, address_id: 3, order_address: addr2, total_amount: total, delivery_fee: 3000 });
+  for (const l of lines) {
+    orderItems.push({ order_item_id: orderItems.length + 1, order_id: o.id, menu_id: l.menu.menu_id, quantity: l.q, unit_price: l.menu.price });
+  }
+  const rejected = o.status === "거절";
+  payments.push({ payment_id: payments.length + 1, order_id: o.id, method: "카드", amount: total + 3000, status: rejected ? "취소완료" : "완료", canceled_at: rejected ? ago(o.minutesAgo - 1) : null, payment_key: `mock_pk_${o.id}`, toss_order_id: `seed-${o.id}` });
+  if (o.delivery) {
+    const delivery_id = deliveries.length + 1;
+    deliveries.push({ delivery_id, order_id: o.id, rider_id: 1, status: o.delivery });
+    const done = o.deliveredMinutesAgo ?? o.minutesAgo - 40;
+    const steps: Delivery["status"][] = ["배정완료", "픽업완료", "배달중", "배달완료"];
+    const upto = steps.indexOf(o.delivery);
+    const times = [o.minutesAgo - 20, o.minutesAgo - 26, o.minutesAgo - 26, done];
+    steps.slice(0, upto + 1).forEach((st, i) =>
+      deliveryHistory.push({ history_id: deliveryHistory.length + 1, delivery_id, status: st, changed_at: ago(times[i]) }),
+    );
+  }
+}
+
+const DAY = 60 * 24;
+/** 이번 주 월요일 0시까지 몇 분 전인지 (정산 주 계산용) */
+const now = new Date();
+const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+const sinceMonday = Math.floor((now.getTime() - monday.getTime()) / 60_000);
+
+seedOrder({ id: 44, minutesAgo: 2, status: "접수대기", items: [[5, 1], [2, 2]] });
+seedOrder({ id: 45, minutesAgo: 9, status: "조리중", items: [[1, 3]] });
+seedOrder({ id: 39, minutesAgo: 3 * 60, status: "거절", items: [[3, 2]] });
+seedOrder({ id: 38, minutesAgo: 5 * 60, status: "조리완료", items: [[1, 1], [3, 1]], delivery: "배달완료" });
+// 지난주(월~일) 배달완료 2건 → 지난주 정산
+seedOrder({ id: 31, minutesAgo: sinceMonday + 2 * DAY, status: "조리완료", items: [[1, 2], [3, 1]], delivery: "배달완료" });
+seedOrder({ id: 30, minutesAgo: sinceMonday + 4 * DAY, status: "조리완료", items: [[5, 2]], delivery: "배달완료" });
+// 2주 전 배달완료 1건 → 지급까지 끝난 정산
+seedOrder({ id: 28, minutesAgo: sinceMonday + 10 * DAY, status: "조리완료", items: [[2, 3], [5, 1]], delivery: "배달완료" });
+
+/* ───── 정산 (매주 월요일 서버가 자동 생성) ───── */
+const ymd = (daysBeforeMonday: number) => {
+  const d = new Date(monday.getTime() - daysBeforeMonday * DAY * 60_000);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const share = (orderId: number, target: "음식점" | "라이더") => {
+  const o = orders.find((x) => x.order_id === orderId)!;
+  return target === "음식점" ? o.total_amount : o.delivery_fee;
+};
+const settlementItems: SettlementItem[] = [];
+const settlements: Settlement[] = [];
+function seedSettlement(s: { id: number; restaurant_id?: number; rider_id?: number; weeksAgo: 1 | 2; status: Settlement["status"]; orderIds: number[] }) {
+  const target = s.restaurant_id ? "음식점" : "라이더";
+  for (const oid of s.orderIds) {
+    settlementItems.push({ settlement_item_id: settlementItems.length + 1, settlement_id: s.id, order_id: oid, pay_target: target, pay_amount: share(oid, target) });
+  }
+  settlements.push({
+    settlement_id: s.id,
+    restaurant_id: s.restaurant_id ?? null,
+    rider_id: s.rider_id ?? null,
+    start_date: ymd(7 * s.weeksAgo),
+    end_date: ymd(7 * s.weeksAgo - 6),
+    amount: s.orderIds.reduce((sum, oid) => sum + share(oid, target), 0),
+    status: s.status,
+  });
+}
+seedSettlement({ id: 1, restaurant_id: 1, weeksAgo: 2, status: "지급완료", orderIds: [28] });
+seedSettlement({ id: 2, restaurant_id: 1, weeksAgo: 1, status: "생성완료", orderIds: [31, 30] });
+seedSettlement({ id: 3, rider_id: 1, weeksAgo: 2, status: "지급완료", orderIds: [28] });
+seedSettlement({ id: 4, rider_id: 1, weeksAgo: 1, status: "생성완료", orderIds: [31, 30] });
+
 export const db = {
   users: [
     { id: 1, role: "customer", name: "김지민", email: "customer@test.com", password: "test1234", phone: "010-2345-6789" },
-    { id: 2, role: "customer", name: "이미 가입", email: "taken@test.com", password: "test1234", phone: "010-1111-2222" },
+    { id: 2, role: "customer", name: "이수아", email: "taken@test.com", password: "test1234", phone: "010-1111-2222" },
     { id: 1, role: "owner", name: "박사장", email: "owner@test.com", password: "test1234", restaurant_id: 1 },
     { id: 2, role: "owner", name: "최신규", email: "newowner@test.com", password: "test1234", restaurant_id: null },
     { id: 1, role: "rider", name: "정라이더", email: "rider@test.com", password: "test1234", phone: "010-3456-7890" },
@@ -128,6 +208,8 @@ export const db = {
   payments,
   deliveries,
   deliveryHistory,
+  settlements,
+  settlementItems,
 };
 
 /** 같은 역할 안에서만 이메일 중복 검사 (고객·점주·라이더 테이블이 따로라서) */

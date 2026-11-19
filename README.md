@@ -34,10 +34,18 @@ npm run dev                    # http://localhost:3000
 
 - `customer@test.com`에는 예시 주문 3건이 있어요: `#0042` 배달중, `#0041` 거절(결제 취소), `#0040` 배달완료.
 - 결제는 **테스트 결제창**(토스 결제창 대신)에서 해요. "카드사 승인 실패로 테스트하기"를 체크하면 승인 실패 화면, [닫기]를 누르면 결제 취소 화면이 나와요.
-- 사장님·라이더 화면이 아직 없어서, 새로 한 주문은 **12초마다 자동으로 다음 단계**로 넘어가요 (접수 → 조리중 → 조리완료 → 배정 → 배달중 → 배달완료). `app/_mocks/progress.ts`의 `AUTO_PROGRESS`로 끕니다.
+- 새로 한 주문은 **사장님 화면에서 수락·조리완료**해야 넘어가요. 라이더 화면이 아직 없어서 조리완료 뒤에는 **12초마다 자동으로** 배정 → 배달중 → 배달완료가 돼요. `app/_mocks/progress.ts`의 `AUTO_RIDER`로 끕니다.
 - 품절 메뉴: 김밥천국 "돈까스김밥", 하루돈까스 "냉모밀". 영업종료 가게: 할매순대국. 배달비 무료: 바삭치킨.
 - 주문에 쓴 배송지(`광교중앙로 145`)를 지우면 409 오류가 나요.
 - 가게·메뉴 사진은 `public/mock/`의 임시 그림이에요.
+
+### 사장님 데모 (MSW)
+
+- `owner@test.com`(김밥천국 광교점): 신규 `#0044`, 조리중 `#0045`, 완료 탭에 배달중·배달완료·거절 주문, 정산 2주치가 있어요.
+- 주문 관리 화면을 켜 두면 **25초 뒤부터 60초마다 손님 이수아의 새 주문**이 들어와요 (최대 3건) → 알림음 + "새 주문 n건" 팝업 확인용.
+  알림음은 브라우저 정책 때문에 화면을 한 번 누른 뒤부터 나요.
+- 손님 창과 사장님 창을 같이 띄우면 손님 주문이 10초 안에 사장님 신규 탭에 떠요. **같은 브라우저의 다른 탭은 MSW 메모리를 공유하지 않으니** 시연할 때는 실제 백엔드를 쓰거나, 한 탭 안에서 로그아웃·로그인으로 역할을 바꿔 주세요.
+- `newowner@test.com`: 로그인하면 가게 등록 → 메뉴 등록 → 영업 시작 순서를 볼 수 있어요. 메뉴가 없으면 영업을 켤 수 없어요.
 
 ### 환경변수 (`.env.local`)
 
@@ -89,11 +97,11 @@ npm run dev                    # http://localhost:3000
 | | 주소 | 화면 |
 |---|---|---|
 | ✅ | `/owner/login` · `/owner/signup` | 사장님 로그인 · 회원가입 |
-| ⬜ | `/owner` | 주문 관리 (신규/조리중/완료 탭) |
-| ⬜ | `/owner/restaurant/new` | 가게 등록 (가게가 없을 때) |
-| ⬜ | `/owner/restaurant` | 가게 정보 + 로그아웃 |
-| ⬜ | `/owner/menus` | 메뉴 목록·추가·수정·품절 |
-| ⬜ | `/owner/settlements` · `/[id]` | 정산 목록 · 상세 |
+| ✅ | `/owner` | 주문 관리 (신규/조리중/완료 탭, 수락·거절·조리완료, 영업 토글) |
+| ✅ | `/owner/restaurant/new` | 가게 등록 (가게가 없을 때, 대표 사진 필수) |
+| ✅ | `/owner/restaurant` | 영업 상태 + 가게 정보 수정 + 로그아웃 |
+| ✅ | `/owner/menus` | 메뉴 목록·추가·수정·품절 토글 (사진 선택) |
+| ✅ | `/owner/settlements` · `/[id]` | 정산 목록 · 상세 (라이더와 같은 컴포넌트) |
 
 **라이더 (7)** — 하단 탭: 홈 · 내 배달 · 정산
 
@@ -163,20 +171,23 @@ app/
 │   ├── Modal, ConfirmDialog, QuantityStepper, PriceSummary, FoodImage, EmptyState, StateViews, FixedBottom
 │   ├── PagePlaceholder       # 아직 안 만든 화면의 자리
 │   └── tabs.ts               # 역할별 하단 탭 (react-icons/lu)
-├── _hooks/queries/           # useMe, 손님 쿼리 훅 (customer.ts)
+│   ├── settlement/           # 정산 목록·상세 (사장님·라이더 공통)
+│   ├── Toaster, ToggleSwitch
+├── _hooks/queries/           # useMe, customer.ts, owner.ts
 ├── _lib/
 │   ├── api/                  # client.ts(axios), authApi.ts
 │   ├── auth/                 # token.ts(역할 읽기), schemas.ts(zod)
 │   ├── constants/            # status.ts, polling.ts, roles.ts, queryKeys.ts
 │   ├── types/                # db.ts(테이블 기준), api.ts
 │   └── utils/                # format(금액·시각·주문번호), orderStep(손님 5단계), pendingCheckout
-├── _stores/                  # cartStore (zustand + localStorage)
+├── _stores/                  # cartStore (zustand + localStorage), toastStore, ownerUiStore
 ├── _mocks/                   # MSW (data.ts = 가짜 DB, handlers/, progress.ts = 데모 자동 진행)
 ├── _providers/               # QueryClient, MSW
 ├── (auth)/login, signup      # 손님 로그인·가입 (탭 없음)
 ├── (customer)/               # 손님 화면 (URL에 (customer) 안 붙음)
 ├── owner/login, signup       # 사장님 로그인·가입
-├── owner/(main)/             # 로그인한 사장님 화면 (하단 탭 + 새 주문 감시)
+├── owner/_components/        # OwnerShell(가게 확인·새 주문 감시), OpenToggle, RestaurantForm, ImagePicker
+├── owner/(main)/             # 로그인한 사장님 화면 (하단 탭)
 ├── rider/login, signup
 └── rider/(main)/
 ```
@@ -231,7 +242,7 @@ app/
 
 ## API
 
-전체 명세는 **API 요청서**(36개)를 따릅니다. 지금 MSW로 만든 것은 인증 6개 + 손님 9개입니다.
+전체 명세는 **API 요청서**(36개)를 따릅니다. 지금 MSW로 만든 것은 인증 6개 + 손님 9개 + 사장님 11개 + 사진 업로드입니다.
 
 | 번호 | 메서드 | 경로 | 비고 |
 |---|---|---|---|
@@ -242,6 +253,15 @@ app/
 | C9 | POST | `/api/orders` | 토스 승인 + 주문 저장. 아래 참고 |
 | C10 | GET | `/api/customers/me/orders` | 최신순, 결제실패 제외, `delivery_status` 포함 |
 | C11 | GET | `/api/orders/:id` | `items[]`, `payment`, `delivery{status, history[]}` 포함 |
+| O3 | GET | `/api/owners/me/restaurant` | 내 가게 + `menus[]`. 가게가 없으면 404 → 가게 등록으로 |
+| O4·O5 | POST·PATCH | `/api/owners/me/restaurant` | 등록은 영업종료로 시작. 영업중으로 바꿀 때 판매 가능한 메뉴가 없으면 409 |
+| O6 | POST | `/api/owners/me/restaurant/menus` | `{ name, price, image_url }` |
+| O7 | PATCH | `/api/menus/:id` | 수정·품절(`is_sold_out`). 삭제 없음 |
+| O8 | GET | `/api/owners/me/orders` | 결제실패 제외, `customer_name`·`customer_phone`·`items[]`·`delivery{status, rider_name}` 포함 |
+| O9·O10·O11 | PATCH | `/api/orders/:id/accept` · `reject` · `cooked` | 상태가 안 맞으면 409 "이미 ○○ 상태인 주문이에요". 거절은 토스 결제 취소까지 |
+| S2 | GET | `/api/owners/me/settlements` | 최신 주 먼저 |
+| S4 | GET | `/api/settlements/:id` | `items[]`에 `delivered_at` 포함. 본인 정산만 |
+| — | POST | `/api/uploads` | multipart `file` → `{ url }`. 5MB 이하 jpg·png |
 | C1·O1·R1 | POST | `/api/{customers\|owners\|riders}/signup` | 이메일 중복 409. 점주는 phone 없음 |
 | C2·O2·R2 | POST | `/api/{customers\|owners\|riders}/login` | 토큰은 쿠키로. 점주는 `restaurant_id`(없으면 null) |
 | A1 | POST | `/api/auth/logout` | 쿠키 삭제 |
@@ -285,7 +305,8 @@ app/
 - [ ] 품절 메뉴 주문 거부, 점주 주문 목록에 손님 이름·전화번호 포함
 - [ ] [픽업 완료] 요청 하나로 `픽업완료`·`배달중` 이력 2개를 한 트랜잭션에
 - [ ] 정산 자동 생성·지급 스케줄러 + 시연용 수동 실행
-- [ ] 이미지 업로드 API (서버 `uploads/` 폴더 저장, DB엔 주소만)
+- [ ] 이미지 업로드 API `POST /api/uploads` (서버 `uploads/` 폴더 저장, DB엔 주소만)
+- [ ] O9~O11은 현재 상태가 맞지 않으면 409 + "이미 ○○ 상태인 주문이에요" (두 창에서 동시에 눌렀을 때)
 
 ---
 

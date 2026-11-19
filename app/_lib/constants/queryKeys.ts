@@ -6,4 +6,8 @@ export const queryKeys = {
   addresses: ["addresses"] as const,
   myOrders: ["orders", "mine"] as const,
   order: (id: number) => ["orders", id] as const,
+  ownerRestaurant: ["owner", "restaurant"] as const,
+  ownerOrders: ["owner", "orders"] as const,
+  ownerSettlements: ["owner", "settlements"] as const,
+  settlement: (id: number) => ["settlements", id] as const,
 };

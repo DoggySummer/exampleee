@@ -36,3 +36,14 @@ export function formatFee(n: number) {
 export function formatOrderNo(id: number) {
   return `#${String(id).padStart(4, "0")}`;
 }
+
+/** "2026-11-10" → "11월 10일" */
+export function formatDate(ymd: string) {
+  const [, m, d] = ymd.split("-").map(Number);
+  return `${m}월 ${d}일`;
+}
+
+/** 정산 기간 "11월 10일 ~ 11월 16일" */
+export function formatPeriod(start: string, end: string) {
+  return `${formatDate(start)} ~ ${formatDate(end)}`;
+}

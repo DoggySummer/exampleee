@@ -1,6 +1,6 @@
 import type { DeliveryStatus, PaymentMethod } from "@/app/_lib/constants/status";
 import type { Role } from "@/app/_lib/constants/roles";
-import type { Address, DeliveryHistory, Menu, Order, OrderItem, Payment, Restaurant } from "./db";
+import type { Address, DeliveryHistory, Menu, Order, OrderItem, Payment, Restaurant, Settlement, SettlementItem } from "./db";
 
 /** 에러 응답 형식 (API 요청서 공통 규칙) */
 export interface ApiErrorBody {
@@ -81,3 +81,49 @@ export interface OrderDetail extends Order {
 }
 
 export type { PaymentMethod };
+
+/* ───────── 사장님 화면 응답 (API 요청서 O3~O11, S2·S4) ───────── */
+
+/** O3 내 가게 + 메뉴 */
+export type OwnerRestaurant = RestaurantDetail;
+
+/** O4 가게 등록 / O5 가게 수정 */
+export interface RestaurantBody {
+  name: string;
+  address: string;
+  delivery_fee: number;
+  image_url: string;
+}
+
+/** O6 메뉴 등록 / O7 메뉴 수정 */
+export interface MenuBody {
+  name: string;
+  price: number;
+  image_url: string | null;
+  is_sold_out?: boolean;
+}
+
+/** O8 사장님 주문 목록 한 건 */
+export interface OwnerOrder {
+  order_id: number;
+  ordered_time: string;
+  status: Order["status"];
+  order_address: string;
+  total_amount: number;
+  delivery_fee: number;
+  customer_name: string;
+  customer_phone: string;
+  items: { menu_name: string; quantity: number }[];
+  /** 조리완료 뒤 배달 진행 (읽기 전용) */
+  delivery: { status: DeliveryStatus; rider_name: string } | null;
+}
+
+/** S4 정산 상세 */
+export interface SettlementDetail extends Settlement {
+  items: (SettlementItem & { delivered_at: string | null })[];
+}
+
+/** 이미지 업로드 응답 */
+export interface UploadResult {
+  url: string;
+}
