@@ -1,3 +1,4 @@
+import { ApiTags } from '@nestjs/swagger';
 import {
   Controller,
   ForbiddenException,
@@ -54,12 +55,14 @@ export class PaymentsController {
   constructor(private readonly service: PaymentsService) {}
 
   /** API 24 결제 목록 — GET /api/payments */
+  @ApiTags('6 결제 조회')
   @Get()
   list(@CurrentUser() user: AuthUser) {
     return this.service.list(user);
   }
 
   /** API 25 결제 상세 — GET /api/payments/{paymentId} */
+  @ApiTags('6 결제 조회')
   @Get(':paymentId')
   detail(@CurrentUser() user: AuthUser, @Param('paymentId', IdPipe) id: number) {
     return this.service.detail(user, id);

@@ -1,3 +1,4 @@
+import { ApiHeader, ApiTags } from '@nestjs/swagger';
 import {
   BadRequestException,
   Body,
@@ -217,6 +218,7 @@ export class SettlementsController {
   constructor(private readonly service: SettlementsService) {}
 
   /** API 34 주간 정산 목록 — GET /api/settlements?startDate= */
+  @ApiTags('8 정산 조회')
   @Roles('OWNER', 'RIDER')
   @Get()
   list(@CurrentUser() user: AuthUser, @Query('startDate') startDate?: string) {
@@ -224,6 +226,7 @@ export class SettlementsController {
   }
 
   /** API 35 정산 상세와 주문별 지급 내역 — GET /api/settlements/{settlementId} */
+  @ApiTags('8 정산 조회')
   @Roles('OWNER', 'RIDER')
   @Get(':settlementId')
   detail(@CurrentUser() user: AuthUser, @Param('settlementId', IdPipe) id: number) {
@@ -235,6 +238,8 @@ export class SettlementsController {
  * (명세 외 · 시연용) 정산 수동 실행. 헤더 X-Admin-Key 가 .env ADMIN_KEY 와 같아야 함.
  * ADMIN_KEY 를 비워 두면 이 API는 꺼진다(404).
  */
+@ApiTags('정산 수동 실행 (명세 외 · 시연용)')
+@ApiHeader({ name: 'X-Admin-Key', required: true, description: '.env 의 ADMIN_KEY' })
 @Public()
 @Controller('admin/settlements')
 export class AdminSettlementsController {

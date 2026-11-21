@@ -1,3 +1,4 @@
+import { ApiTags } from '@nestjs/swagger';
 import {
   BadRequestException,
   Body,
@@ -93,12 +94,14 @@ export class AddressesController {
   constructor(private readonly service: AddressesService) {}
 
   /** API 06 배송지 목록 — GET /api/addresses */
+  @ApiTags('2 배송지')
   @Get()
   list(@CurrentUser() user: AuthUser) {
     return this.service.list(user);
   }
 
   /** API 07 배송지 등록 — POST /api/addresses (201) */
+  @ApiTags('2 배송지')
   @Post()
   create(
     @CurrentUser() user: AuthUser,
@@ -108,12 +111,14 @@ export class AddressesController {
   }
 
   /** API 08 배송지 상세 — GET /api/addresses/{addressId} */
+  @ApiTags('2 배송지')
   @Get(':addressId')
   detail(@CurrentUser() user: AuthUser, @Param('addressId', IdPipe) id: number) {
     return this.service.detail(user, id);
   }
 
   /** API 09 배송지 수정 — PATCH /api/addresses/{addressId} */
+  @ApiTags('2 배송지')
   @Patch(':addressId')
   update(
     @CurrentUser() user: AuthUser,
@@ -124,6 +129,7 @@ export class AddressesController {
   }
 
   /** API 10 배송지 삭제 — DELETE /api/addresses/{addressId} (204) */
+  @ApiTags('2 배송지')
   @Delete(':addressId')
   @HttpCode(204)
   async remove(@CurrentUser() user: AuthUser, @Param('addressId', IdPipe) id: number) {

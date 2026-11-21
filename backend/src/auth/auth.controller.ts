@@ -1,3 +1,4 @@
+import { ApiTags } from '@nestjs/swagger';
 import { Body, Controller, HttpCode, Post } from '@nestjs/common';
 import { validBody } from '../common/pipes';
 import { AuthUser, CurrentUser, Public } from './auth.decorators';
@@ -9,6 +10,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   /** API 01 회원가입 — POST /api/auth/register (201) */
+  @ApiTags('1 회원')
   @Public()
   @Post('register')
   register(@Body(validBody('가입 정보를 확인해 주세요.')) dto: RegisterDto) {
@@ -16,6 +18,7 @@ export class AuthController {
   }
 
   /** API 02 로그인 — POST /api/auth/login (200) */
+  @ApiTags('1 회원')
   @Public()
   @Post('login')
   @HttpCode(200)
@@ -24,6 +27,7 @@ export class AuthController {
   }
 
   /** API 03 로그아웃 — POST /api/auth/logout (204) */
+  @ApiTags('1 회원')
   @Post('logout')
   @HttpCode(204)
   logout(@CurrentUser() user: AuthUser) {

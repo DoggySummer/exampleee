@@ -1,3 +1,4 @@
+import { ApiTags } from '@nestjs/swagger';
 import {
   Body,
   ConflictException,
@@ -204,6 +205,7 @@ export class DeliveriesController {
   constructor(private readonly service: DeliveriesService) {}
 
   /** API 27 수락 가능한 주문 — GET /api/deliveries/available */
+  @ApiTags('7 라이더 배달')
   @Roles('RIDER')
   @Get('deliveries/available')
   available() {
@@ -211,6 +213,7 @@ export class DeliveriesController {
   }
 
   /** API 28 라이더 배달 수락 — POST /api/orders/{orderId}/delivery/accept (201, 같은 라이더 재요청 200) */
+  @ApiTags('7 라이더 배달')
   @Roles('RIDER')
   @Post('orders/:orderId/delivery/accept')
   async accept(
@@ -224,30 +227,35 @@ export class DeliveriesController {
   }
 
   /** API 29 주문 배달 조회 — GET /api/orders/{orderId}/delivery */
+  @ApiTags('7 라이더 배달')
   @Get('orders/:orderId/delivery')
   byOrder(@CurrentUser() user: AuthUser, @Param('orderId', IdPipe) orderId: number) {
     return this.service.byOrder(user, orderId);
   }
 
   /** API 30 배달 목록 — GET /api/deliveries */
+  @ApiTags('7 라이더 배달')
   @Get('deliveries')
   list(@CurrentUser() user: AuthUser) {
     return this.service.list(user);
   }
 
   /** API 31 배달 상세 — GET /api/deliveries/{deliveryId} */
+  @ApiTags('7 라이더 배달')
   @Get('deliveries/:deliveryId')
   detail(@CurrentUser() user: AuthUser, @Param('deliveryId', IdPipe) id: number) {
     return this.service.detail(user, id);
   }
 
   /** API 32 배달 상태이력 — GET /api/deliveries/{deliveryId}/history */
+  @ApiTags('7 라이더 배달')
   @Get('deliveries/:deliveryId/history')
   history(@CurrentUser() user: AuthUser, @Param('deliveryId', IdPipe) id: number) {
     return this.service.history(user, id);
   }
 
   /** API 33 배달 상태 변경 — PATCH /api/deliveries/{deliveryId}/status */
+  @ApiTags('7 라이더 배달')
   @Roles('RIDER')
   @Patch('deliveries/:deliveryId/status')
   changeStatus(

@@ -1,3 +1,4 @@
+import { ApiHeader, ApiTags } from '@nestjs/swagger';
 import {
   BadRequestException,
   Body,
@@ -258,6 +259,8 @@ export class OrdersController {
   constructor(private readonly service: OrdersService) {}
 
   /** API 19 주문과 결제 생성 — POST /api/orders (201, 같은 Idempotency-Key 재요청은 200) */
+  @ApiTags('5 주문')
+  @ApiHeader({ name: 'Idempotency-Key', required: false, description: '주문 시도별 키 (1~200자). 같은 키·같은 요청 재전송은 처음 주문을 200으로 반환' })
   @Roles('CUSTOMER')
   @Post()
   async create(
@@ -272,18 +275,21 @@ export class OrdersController {
   }
 
   /** API 20 주문 목록 — GET /api/orders?status= */
+  @ApiTags('5 주문')
   @Get()
   list(@CurrentUser() user: AuthUser, @Query('status') status?: string) {
     return this.service.list(user, status || undefined);
   }
 
   /** API 21 주문 상세 — GET /api/orders/{orderId} */
+  @ApiTags('5 주문')
   @Get(':orderId')
   detail(@CurrentUser() user: AuthUser, @Param('orderId', IdPipe) id: number) {
     return this.service.detail(user, id);
   }
 
   /** API 22 점주 주문 상태 변경 — PATCH /api/orders/{orderId}/status */
+  @ApiTags('5 주문')
   @Roles('OWNER')
   @Patch(':orderId/status')
   changeStatus(
@@ -295,6 +301,7 @@ export class OrdersController {
   }
 
   /** API 23 주문 결제 조회 — GET /api/orders/{orderId}/payments */
+  @ApiTags('6 결제 조회')
   @Roles('CUSTOMER', 'OWNER')
   @Get(':orderId/payments')
   payments(@CurrentUser() user: AuthUser, @Param('orderId', IdPipe) id: number) {

@@ -17,13 +17,23 @@ cp .env.example .env            # DB 비밀번호, JWT_SECRET 채우기
 mysql -u root -p < database/schema.sql
 mysql -u root -p < database/seed.sql     # (선택) 테스트 계정·가게
 
-npm run start:dev               # http://localhost:4000/api  (상태 확인: /api/health)
+npm run start:dev               # http://localhost:4000/api  → Swagger 문서 (상태 확인: /api/health)
 ```
 
 프론트(Next.js)는 `.env.local`에서 `NEXT_PUBLIC_API_MOCKING=disabled`, `NEXT_PUBLIC_API_URL=http://localhost:4000` 으로 바꾸면 됩니다.
 CORS는 기본 `http://localhost:3000` 허용 (`CORS_ORIGIN`으로 변경).
 
 > 명세 예시 주소는 `localhost:3000`인데, 프론트가 3000을 쓰므로 백엔드는 **4000**을 기본값으로 했습니다.
+
+### Swagger 문서
+
+`http://localhost:4000/api` 에서 명세서 번호별로 묶인 API 문서를 볼 수 있고, 바로 호출해 볼 수도 있어요.
+
+1. `1 회원` → `POST /api/auth/login` 실행 (시드 계정 사용)
+2. 응답의 `token` 복사 → 오른쪽 위 **Authorize** 에 붙여넣기
+3. 보호된 API 호출 (새로고침해도 토큰 유지)
+
+OpenAPI JSON은 `http://localhost:4000/api-json` 이에요.
 
 ### 시드 계정 (비밀번호 모두 `test1234`)
 

@@ -1,3 +1,4 @@
+import { ApiTags } from '@nestjs/swagger';
 import {
   BadRequestException,
   Body,
@@ -152,6 +153,7 @@ export class StoresController {
   constructor(private readonly service: StoresService) {}
 
   /** API 11 음식점 목록 — GET /api/stores?q= */
+  @ApiTags('3 음식점')
   @Public()
   @Get('stores')
   list(@Query('q') q?: string) {
@@ -159,6 +161,7 @@ export class StoresController {
   }
 
   /** API 12 음식점 상세 — GET /api/stores/{storeId} */
+  @ApiTags('3 음식점')
   @Public()
   @Get('stores/:storeId')
   detail(@Param('storeId', IdPipe) id: number) {
@@ -166,6 +169,7 @@ export class StoresController {
   }
 
   /** API 13 점주 내 음식점 — GET /api/me/stores */
+  @ApiTags('3 음식점')
   @Roles('OWNER')
   @Get('me/stores')
   myStores(@CurrentUser() user: AuthUser) {
@@ -173,6 +177,7 @@ export class StoresController {
   }
 
   /** API 14 음식점 등록 — POST /api/stores (201) */
+  @ApiTags('3 음식점')
   @Roles('OWNER')
   @Post('stores')
   create(
@@ -183,6 +188,7 @@ export class StoresController {
   }
 
   /** API 15 음식점 수정·영업상태 변경 — PATCH /api/stores/{storeId} */
+  @ApiTags('3 음식점')
   @Roles('OWNER')
   @Patch('stores/:storeId')
   update(
@@ -194,6 +200,7 @@ export class StoresController {
   }
 
   /** API 16 메뉴 목록 — GET /api/stores/{storeId}/menus */
+  @ApiTags('4 메뉴')
   @Public()
   @Get('stores/:storeId/menus')
   listMenus(@Param('storeId', IdPipe) storeId: number) {
@@ -201,6 +208,7 @@ export class StoresController {
   }
 
   /** API 17 메뉴 등록 — POST /api/stores/{storeId}/menus (201) */
+  @ApiTags('4 메뉴')
   @Roles('OWNER')
   @Post('stores/:storeId/menus')
   createMenu(
@@ -212,6 +220,7 @@ export class StoresController {
   }
 
   /** API 18 메뉴 수정 — PATCH /api/stores/{storeId}/menus/{menuId} */
+  @ApiTags('4 메뉴')
   @Roles('OWNER')
   @Patch('stores/:storeId/menus/:menuId')
   updateMenu(

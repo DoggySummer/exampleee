@@ -1,3 +1,4 @@
+import { ApiTags } from '@nestjs/swagger';
 import {
   BadRequestException,
   Body,
@@ -86,12 +87,14 @@ export class UsersController {
   constructor(private readonly users: UsersService) {}
 
   /** API 04 내 정보 조회 — GET /api/me */
+  @ApiTags('1 회원')
   @Get('me')
   me(@CurrentUser() user: AuthUser) {
     return this.users.me(user);
   }
 
   /** API 05 내 정보 수정 — PATCH /api/me */
+  @ApiTags('1 회원')
   @Patch('me')
   updateMe(
     @CurrentUser() user: AuthUser,
@@ -101,6 +104,7 @@ export class UsersController {
   }
 
   /** API 26 라이더 운행상태 변경 — PATCH /api/riders/me/status */
+  @ApiTags('7 라이더 배달')
   @Roles('RIDER')
   @Patch('riders/me/status')
   riderStatus(
